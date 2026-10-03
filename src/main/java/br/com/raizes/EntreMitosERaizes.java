@@ -10,6 +10,8 @@ import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileInputStream;
@@ -52,12 +54,16 @@ public final class EntreMitosERaizes {
         private final Timer timer;
         private Screen screen = Screen.MENU;
         private Screen settingsReturn = Screen.MENU;
-        private BufferedImage playerImage, playerWalk, curupiraImage;
+        private BufferedImage playerImage, playerWalk1, playerWalk2, curupiraImage, gameBackground, menuBackground, menuTitle;
+        private final BufferedImage[] menuImages = new BufferedImage[5];
+        private final Rectangle[] menuBounds = new Rectangle[5];
         private String name = "Viajante", toast = "";
         private String[] dialogue = { "Curupira", "A floresta esta em perigo. Colete as sementes e avance pela trilha.", "Pule os obstaculos, pise nos inimigos e chegue a clareira.", "Boa sorte, " + name + "!" };
         private int menuIndex, slotIndex, settingsIndex, lives = 3, coinsCollected, battleChoice;
         private int textScale = 1;
         private boolean contrast, nameConfirm, won, onGround;
+        private boolean facingRight = true, walking;
+        private int walkingFrame;
         private double x = 110, y = 500, vy, camera, elapsed;
         private int dialogueIndex;
         private long toastUntil;
@@ -77,6 +83,22 @@ public final class EntreMitosERaizes {
                     }
                 }
             });
+            addMouseMotionListener(new MouseAdapter() {
+                @Override public void mouseMoved(MouseEvent e) {
+                    if (screen != Screen.MENU) return;
+                    menuIndex = menuAt(e.getX(), e.getY());
+                    setCursor(menuIndex >= 0 ? java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR) : java.awt.Cursor.getDefaultCursor());
+                    repaint();
+                }
+            });
+            addMouseListener(new MouseAdapter() {
+                @Override public void mouseClicked(MouseEvent e) {
+                    if (screen == Screen.MENU) {
+                        int selected = menuAt(e.getX(), e.getY());
+                        if (selected >= 0) { menuIndex = selected; menuKey(KeyEvent.VK_ENTER); }
+                    }
+                }
+            });
             timer = new Timer(16, e -> tick());
             timer.start();
             SwingUtilities.invokeLater(this::requestFocusInWindow);
@@ -84,8 +106,17 @@ public final class EntreMitosERaizes {
 
         private void loadImages() {
             playerImage = image("Image/Personagens/Greg/GregParadoD.png");
-            playerWalk = image("Image/Personagens/Greg/GregAndandoDPT1.png");
+            playerWalk1 = image("Image/Personagens/Greg/GregAndandoDPT1.png");
+            playerWalk2 = image("Image/Personagens/Greg/GregAndandoDPT2.png");
             curupiraImage = image("Image/Personagens/guardioes/CURUPIRA.PNG");
+            gameBackground = image("Image/Cenarios/FundoDoJogo.jpeg");
+            menuBackground = image("Image/Cenarios/Menu/MENU.jpg");
+            menuTitle = image("Image/Cenarios/Menu/Titulo.png");
+            menuImages[0] = image("Image/Cenarios/Menu/NovoGame.png");
+            menuImages[1] = image("Image/Cenarios/Menu/Continuar.png");
+            menuImages[2] = image("Image/Cenarios/Menu/Configuracoes.png");
+            menuImages[3] = image("Image/Cenarios/Menu/Interrogacao.png");
+            menuImages[4] = image("Image/Cenarios/Menu/Sair.png");
         }
 
         private BufferedImage image(String path) {
@@ -114,6 +145,9 @@ public final class EntreMitosERaizes {
 
         private void updateWorld(double dt) {
             double dx = (held.contains(KeyEvent.VK_D) || held.contains(KeyEvent.VK_RIGHT) ? 1 : 0) - (held.contains(KeyEvent.VK_A) || held.contains(KeyEvent.VK_LEFT) ? 1 : 0);
+            walking = dx != 0;
+            if (walking) { walkingFrame++; if (dx > 0) facingRight = true; else facingRight = false; }
+            else walkingFrame = 0;
             x = clamp(x + dx * 260 * dt, 0, WORLD_W - 42);
             if ((held.contains(KeyEvent.VK_SPACE) || held.contains(KeyEvent.VK_W) || held.contains(KeyEvent.VK_UP)) && onGround) { vy = -590; onGround = false; }
             vy += 1350 * dt;
@@ -222,7 +256,54 @@ public final class EntreMitosERaizes {
             g.dispose();
         }
 
-        private void drawMenu(Graphics2D g) { drawBackdrop(g); drawText(g, "ENTRE MITOS", 430, 150, 56, new Color(255, 216, 92)); drawText(g, "E RAIZES", 482, 212, 56, Color.WHITE); drawText(g, "A TRILHA DO CURUPIRA", 475, 252, 18, new Color(204, 235, 191)); String[] options = { "NOVO JOGO", "CONTINUAR", "CONFIGURACOES", "EXTRAS", "SAIR" }; for (int i = 0; i < options.length; i++) { int y = 330 + i * 48; g.setColor(i == menuIndex ? new Color(217, 92, 70) : new Color(24, 58, 50, 220)); g.fillRoundRect(415, y - 28, 450, 40, 8, 8); drawText(g, (i == menuIndex ? "> " : "  ") + options[i], 455, y, 20, Color.WHITE); } drawText(g, "Setas/WASD selecionam   Enter confirma", 432, 625, 15, new Color(229, 242, 208)); }
+        private void drawMenu(Graphics2D g) {
+            drawImageCover(g, menuBackground, 0, 0, W, H);
+            g.setColor(new Color(0, 0, 0, 72));
+            g.fillRect(0, 0, W, H);
+            if (menuTitle != null) drawImageFit(g, menuTitle, W / 2 - 250, 48, 500, 175);
+            for (int i = 0; i < menuImages.length; i++) {
+                BufferedImage button = menuImages[i];
+                if (button == null) continue;
+                int maxWidth = i == 3 ? 82 : 300;
+                int maxHeight = i == 3 ? 82 : 58;
+                double scale = Math.min(maxWidth / (double) button.getWidth(), maxHeight / (double) button.getHeight());
+                int width = Math.max(1, (int) (button.getWidth() * scale));
+                int height = Math.max(1, (int) (button.getHeight() * scale));
+                int centerX = i == 3 ? 1110 : 290;
+                int centerY = i == 3 ? 625 : 285 + i * 72;
+                menuBounds[i] = new Rectangle(centerX - width / 2, centerY - height / 2, width, height);
+                Rectangle bounds = menuBounds[i];
+                if (i == menuIndex) {
+                    g.setColor(new Color(255, 226, 110, 90));
+                    g.fillRoundRect(bounds.x - 12, bounds.y - 8, bounds.width + 24, bounds.height + 16, 12, 12);
+                }
+                g.drawImage(button, bounds.x, bounds.y, bounds.width, bounds.height, this);
+            }
+            drawText(g, "Setas/WASD selecionam   Enter ou clique confirma", 410, 675, 15, Color.WHITE);
+        }
+
+        private int menuAt(int mouseX, int mouseY) {
+            for (int i = 0; i < menuBounds.length; i++) if (menuBounds[i] != null && menuBounds[i].contains(mouseX, mouseY)) return i;
+            return -1;
+        }
+        private void drawImageFit(Graphics2D g, BufferedImage image, int x, int y, int width, int height) {
+            if (image == null) return;
+            double scale = Math.min(width / (double) image.getWidth(), height / (double) image.getHeight());
+            int drawWidth = (int) (image.getWidth() * scale);
+            int drawHeight = (int) (image.getHeight() * scale);
+            g.drawImage(image, x + (width - drawWidth) / 2, y + (height - drawHeight) / 2, drawWidth, drawHeight, this);
+        }
+
+        private void drawImageCover(Graphics2D g, BufferedImage image, int x, int y, int width, int height) {
+            if (image == null) { g.setColor(new Color(25, 69, 53)); g.fillRect(x, y, width, height); return; }
+            double scale = Math.max(width / (double) image.getWidth(), height / (double) image.getHeight());
+            int drawWidth = (int) (image.getWidth() * scale);
+            int drawHeight = (int) (image.getHeight() * scale);
+            int drawX = x + (width - drawWidth) / 2;
+            int drawY = y + (height - drawHeight) / 2;
+            g.drawImage(image, drawX, drawY, drawWidth, drawHeight, this);
+        }
+
         private void drawBackdrop(Graphics2D g) { g.setColor(new Color(25, 69, 53)); g.fillRect(0, 0, W, H); g.setColor(new Color(51, 120, 75)); for (int i = 0; i < 18; i++) g.fillOval(i * 85 - 40, 280 + (i % 3) * 70, 260, 260); g.setColor(new Color(35, 89, 62)); g.fillRect(0, 570, W, 150); }
         private void drawSlots(Graphics2D g) { drawBackdrop(g); drawText(g, "ESCOLHA UM SLOT", 440, 150, 36, Color.WHITE); for (int i = 0; i < 2; i++) { int xx = 250 + i * 420; g.setColor(i == slotIndex ? new Color(217, 92, 70) : new Color(24, 58, 50)); g.fillRoundRect(xx, 250, 360, 170, 12, 12); drawText(g, "SLOT " + (i + 1), xx + 34, 300, 25, Color.WHITE); drawText(g, hasSave(i) ? saveSummary(i) : "Vazio - Enter para criar", xx + 34, 345, 16, new Color(245, 230, 190)); drawText(g, "Delete apaga", xx + 34, 385, 14, new Color(196, 222, 188)); } drawText(g, "A/D escolhem   Enter abre   Esc volta", 430, 625, 15, Color.WHITE); }
         private void drawName(Graphics2D g) { drawBackdrop(g); drawText(g, "COMO TE CHAMAM?", 405, 200, 34, Color.WHITE); g.setColor(panel()); g.fillRoundRect(330, 270, 620, 90, 10, 10); drawText(g, name + (System.currentTimeMillis() / 400 % 2 == 0 ? "_" : ""), 380, 330, 28, ink()); drawText(g, nameConfirm ? "Enter para confirmar" : "Digite seu apelido e pressione Enter", 420, 430, 17, Color.WHITE); }
@@ -230,9 +311,9 @@ public final class EntreMitosERaizes {
         private void drawControls(Graphics2D g) { drawBackdrop(g); drawText(g, "CONTROLES", 470, 170, 38, Color.WHITE); drawText(g, "A/D ou SETAS: correr", 410, 280, 24, Color.WHITE); drawText(g, "W, SETA CIMA ou ESPACO: pular", 410, 330, 24, Color.WHITE); drawText(g, "M: mapa     F5: salvar     Esc: pausar", 410, 380, 24, Color.WHITE); drawText(g, "Enter ou Esc para voltar", 470, 590, 17, new Color(245, 230, 190)); }
         private void drawExtras(Graphics2D g) { drawBackdrop(g); drawText(g, "EXTRAS", 520, 165, 38, Color.WHITE); drawText(g, "Uma aventura inspirada nas lendas da floresta brasileira.", 285, 280, 22, Color.WHITE); drawText(g, "Proteja a mata, respeite os animais e escute o Curupira.", 310, 330, 20, new Color(245, 230, 190)); drawText(g, "Enter ou Esc para voltar", 475, 590, 17, Color.WHITE); }
 
-        private void drawWorld(Graphics2D g) { g.setColor(new Color(125, 193, 228)); g.fillRect(0, 0, W, H); g.setColor(new Color(210, 242, 187)); g.fillOval(80, 70, 230, 90); g.fillOval(800, 105, 280, 100); g.setColor(new Color(75, 151, 83)); g.fillRect(0, 390, W, 330); g.translate(-camera, 0); for (int i = 0; i < WORLD_W; i += 190) { g.setColor(new Color(31, 102, 69)); g.fillRect(i + 35, 310, 34, 290); g.fillOval(i, 220, 110, 120); } for (Rectangle p : platforms) { g.setColor(new Color(115, 72, 48)); g.fillRect(p.x, p.y, p.width, p.height); g.setColor(new Color(70, 170, 78)); g.fillRect(p.x, p.y, p.width, 9); } for (Thing coin : coins) if (!coin.hit) { g.setColor(new Color(255, 215, 55)); g.fillOval(coin.x - 11, coinY(coin), 22, 22); g.setColor(new Color(255, 246, 151)); g.fillOval(coin.x - 5, coinY(coin) + 4, 5, 7); } for (Thing enemy : enemies) if (!enemy.hit) { g.setColor(new Color(106, 55, 42)); g.fillOval(enemy.x - 20, 552, 40, 48); g.setColor(new Color(245, 177, 130)); g.fillOval(enemy.x - 13, 558, 26, 22); g.setColor(Color.WHITE); g.fillOval(enemy.x - 9, 564, 6, 6); g.fillOval(enemy.x + 3, 564, 6, 6); } drawPlayer(g); g.translate(camera, 0); g.setColor(new Color(25, 48, 51, 210)); g.fillRect(0, 0, W, 78); drawText(g, "SEMENTES " + coinsCollected + "/12", 30, 34, 19, Color.WHITE); drawText(g, "VIDAS " + "*".repeat(lives), 230, 34, 19, new Color(255, 151, 125)); drawText(g, "M mapa   F5 salvar   Esc pausa", 930, 34, 15, Color.WHITE); }
+        private void drawWorld(Graphics2D g) { g.setColor(new Color(75, 151, 83)); g.fillRect(0, 0, W, H); drawImageCover(g, gameBackground, 0, 78, 1600, 522); drawImageCover(g, gameBackground, 1600, 78, 1600, 522); g.translate(-camera, 0); for (int i = 0; i < WORLD_W; i += 190) { g.setColor(new Color(31, 102, 69, 135)); g.fillRect(i + 35, 310, 34, 290); g.fillOval(i, 220, 110, 120); } for (Rectangle p : platforms) { g.setColor(new Color(115, 72, 48)); g.fillRect(p.x, p.y, p.width, p.height); g.setColor(new Color(70, 170, 78)); g.fillRect(p.x, p.y, p.width, 9); } for (Thing coin : coins) if (!coin.hit) { g.setColor(new Color(255, 215, 55)); g.fillOval(coin.x - 11, coinY(coin), 22, 22); g.setColor(new Color(255, 246, 151)); g.fillOval(coin.x - 5, coinY(coin) + 4, 5, 7); } for (Thing enemy : enemies) if (!enemy.hit) { g.setColor(new Color(106, 55, 42)); g.fillOval(enemy.x - 20, 552, 40, 48); g.setColor(new Color(245, 177, 130)); g.fillOval(enemy.x - 13, 558, 26, 22); g.setColor(Color.WHITE); g.fillOval(enemy.x - 9, 564, 6, 6); g.fillOval(enemy.x + 3, 564, 6, 6); } drawPlayer(g); g.translate(camera, 0); g.setColor(new Color(25, 48, 51, 210)); g.fillRect(0, 0, W, 78); drawText(g, "SEMENTES " + coinsCollected + "/12", 30, 34, 19, Color.WHITE); drawText(g, "VIDAS " + "*".repeat(lives), 230, 34, 19, new Color(255, 151, 125)); drawText(g, "M mapa   F5 salvar   Esc pausa", 930, 34, 15, Color.WHITE); }
         private int coinY(Thing coin) { return coin.y == 0 ? (int)(420 + Math.sin(elapsed * 3 + coin.x) * 30) : coin.y; }
-        private void drawPlayer(Graphics2D g) { int px = (int)x, py = (int)y; Image image = (held.contains(KeyEvent.VK_A) || held.contains(KeyEvent.VK_LEFT) || held.contains(KeyEvent.VK_D) || held.contains(KeyEvent.VK_RIGHT)) ? playerWalk : playerImage; if (image != null) g.drawImage(image, px - 8, py - 20, 58, 78, this); else { g.setColor(new Color(217, 92, 70)); g.fillOval(px, py, 38, 38); g.setColor(new Color(242, 177, 139)); g.fillOval(px + 5, py - 17, 28, 28); } }
+        private void drawPlayer(Graphics2D g) { int px = (int)x, py = (int)y; Image image = walking ? ((walkingFrame / 8) % 2 == 0 ? playerWalk1 : playerWalk2) : playerImage; if (image != null) { if (facingRight) g.drawImage(image, px - 8, py - 20, 58, 78, this); else g.drawImage(image, px + 50, py - 20, px - 8, py + 58, 0, 0, image.getWidth(this), image.getHeight(this), this); } else { g.setColor(new Color(217, 92, 70)); g.fillOval(px, py, 38, 38); g.setColor(new Color(242, 177, 139)); g.fillOval(px + 5, py - 17, 28, 28); } }
         private void drawPause(Graphics2D g) { g.setColor(new Color(11, 28, 27, 225)); g.fillRect(310, 130, 660, 470); drawText(g, "PAUSA", 570, 205, 42, new Color(255, 216, 92)); String[] options = { "Continuar", "Salvar", "Configuracoes", "Mapa", "Sair para o menu" }; for (int i = 0; i < options.length; i++) drawText(g, (i == menuIndex ? "> " : "  ") + options[i], 495, 290 + i * 52, 22, Color.WHITE); }
         private void drawMap(Graphics2D g) { g.setColor(new Color(13, 39, 38, 245)); g.fillRect(100, 100, 1080, 520); drawText(g, "MAPA DA TRILHA", 485, 170, 34, new Color(255, 216, 92)); g.setColor(new Color(86, 151, 80)); g.fillRoundRect(210, 330, 220, 80, 12, 12); g.fillRoundRect(530, 250, 220, 80, 12, 12); g.fillRoundRect(850, 350, 220, 80, 12, 12); drawText(g, "INICIO", 280, 378, 20, Color.WHITE); drawText(g, "FLORESTA", 580, 298, 20, Color.WHITE); drawText(g, "CLAREIRA", 915, 398, 20, Color.WHITE); drawText(g, "M ou Esc para voltar", 520, 555, 17, Color.WHITE); }
         private void drawDialogue(Graphics2D g) { g.setColor(new Color(8, 22, 23, 220)); g.fillRoundRect(100, 500, 1080, 150, 12, 12); if (curupiraImage != null) g.drawImage(curupiraImage, 135, 370, 140, 180, this); drawText(g, dialogue[dialogueIndex], 310, 545, 23, new Color(255, 216, 92)); drawText(g, dialogue[Math.min(dialogueIndex + 1, dialogue.length - 1)], 310, 590, 19, Color.WHITE); drawText(g, "Enter/E/Space para continuar", 850, 630, 14, new Color(196, 222, 188)); }
