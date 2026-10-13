@@ -18,9 +18,12 @@ import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Image;
+import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.Shape;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
@@ -108,9 +111,15 @@ public final class Game extends JPanel {
         setPreferredSize(new Dimension(W, H));
         setFocusable(true);
         setLayout(null);
+        setBackground(Color.BLACK);
+        setOpaque(true);
         cinematicManager = new CinematicManager(OPENING_VIDEOS, OPENING_NARRATION, this::showToast, this::finishOpening);
         worldRenderer = new WorldRenderer(this);
         add(cinematicManager.panel());
+        addComponentListener(new ComponentAdapter() {
+            @Override public void componentResized(ComponentEvent event) { layoutCinematicPanel(); }
+        });
+        layoutCinematicPanel();
         loadImages();
         buildLevel();
         addKeyListener(new KeyAdapter() {
@@ -124,10 +133,18 @@ public final class Game extends JPanel {
             }
         });
         addMouseMotionListener(new MouseAdapter() {
-            @Override public void mouseMoved(MouseEvent e) { updateMouseHover(e.getX(), e.getY()); }
+            @Override public void mouseMoved(MouseEvent e) {
+                Point point = toGameCoordinates(e.getX(), e.getY());
+                updateMouseHover(point.x, point.y);
+            }
         });
         addMouseListener(new MouseAdapter() {
-            @Override public void mouseClicked(MouseEvent e) { if (e.getButton() == MouseEvent.BUTTON1) handleMouseClick(e.getX(), e.getY()); }
+            @Override public void mouseClicked(MouseEvent e) {
+                if (e.getButton() == MouseEvent.BUTTON1) {
+                    Point point = toGameCoordinates(e.getX(), e.getY());
+                    handleMouseClick(point.x, point.y);
+                }
+            }
         });
         timer = new Timer(16, e -> tick());
         timer.start();
@@ -527,6 +544,29 @@ public final class Game extends JPanel {
 
     private void returnToMenu() { screen = GameState.MENU; menuIndex = 0; choosingContinue = false; }
 
+    private double viewportScale() {
+        if (getWidth() <= 0 || getHeight() <= 0) return 1.0;
+        return Math.min(getWidth() / (double) W, getHeight() / (double) H);
+    }
+
+    private int viewportX(double scale) { return (int) Math.round((getWidth() - W * scale) / 2.0); }
+    private int viewportY(double scale) { return (int) Math.round((getHeight() - H * scale) / 2.0); }
+
+    private Point toGameCoordinates(int x, int y) {
+        double scale = viewportScale();
+        return new Point((int) Math.floor((x - viewportX(scale)) / scale),
+            (int) Math.floor((y - viewportY(scale)) / scale));
+    }
+
+    private void layoutCinematicPanel() {
+        double scale = viewportScale();
+        int x = viewportX(scale);
+        int y = viewportY(scale);
+        int width = (int) Math.round(W * scale);
+        int height = (int) Math.round(H * scale);
+        cinematicManager.panel().setBounds(x, y, width, height);
+    }
+
     private boolean inside(int x, int y, int bx, int by, int bw, int bh) { return new Rectangle(bx, by, bw, bh).contains(x, y); }
 
     private void updateMouseHover(int x, int y) {
@@ -690,6 +730,9 @@ public final class Game extends JPanel {
     @Override protected void paintComponent(Graphics graphics) {
         super.paintComponent(graphics);
         Graphics2D g = (Graphics2D) graphics.create();
+        double scale = viewportScale();
+        g.translate(viewportX(scale), viewportY(scale));
+        g.scale(scale, scale);
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         if (screen == GameState.SAVE_CONFIRM) { drawSaveConfirmationScreen(g); if (!toast.isEmpty()) { g.setColor(new Color(0, 0, 0, 190)); g.fillRoundRect(350, 645, 580, 42, 10, 10); drawText(g, toast, 380, 673, 16, Color.WHITE); } g.dispose(); return; }
         if (screen == GameState.MENU) drawMenu(g); else if (screen == GameState.SLOTS) drawSlots(g); else if (screen == GameState.SAVE_OPTIONS) { drawMenu(g); drawPopupDim(g); drawSaveOptions(g); } else if (screen == GameState.PHASE_SELECT) { drawMenu(g); drawPopupDim(g); drawPhaseSelect(g); } else if (screen == GameState.SAVE_CONFIRM) { if(confirmReturn==GameState.PHASE_SELECT){drawMenu(g);drawPopupDim(g);drawPhaseSelect(g);}else drawSlots(g); drawPopupDim(g); drawSaveConfirmation(g); } else if (screen == GameState.NAME) drawName(g); else if (screen == GameState.PHASE_INTRO) drawPhaseIntro(g); else if (screen == GameState.BATTLE) { drawImageCover(g, menuBackground, 0, 0, W, H); g.setColor(new Color(0, 0, 0, 82)); g.fillRect(0, 0, W, H); drawBattle(g); } else if (screen == GameState.SETTINGS) { drawSettingsUnderlay(g); drawPopupDim(g); drawSettings(g); } else if (screen == GameState.CONTROLS) { drawSettingsUnderlay(g); drawPopupDim(g); drawControls(g); } else if (screen == GameState.EXTRAS) { drawMenu(g); drawPopupDim(g); drawExtras(g); } else { drawWorld(g); if (screen == GameState.PAUSE) drawPause(g); else if (screen == GameState.MAP) drawMap(g); else if (screen == GameState.DIALOGUE) drawDialogue(g); else if (screen == GameState.END) drawEnd(g); }

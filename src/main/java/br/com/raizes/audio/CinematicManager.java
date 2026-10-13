@@ -2,6 +2,7 @@ package br.com.raizes.audio;
 
 import br.com.raizes.assets.AssetManager;
 import br.com.raizes.config.GameConfig;
+import java.awt.Component;
 import java.io.File;
 import java.util.function.Consumer;
 import javafx.application.Platform;
@@ -42,7 +43,7 @@ public final class CinematicManager {
         Platform.runLater(this::initializePanel);
     }
 
-    public JFXPanel panel() { return panel; }
+    public Component panel() { return panel; }
 
     public void setVisible(boolean visible) { panel.setVisible(visible); }
 
