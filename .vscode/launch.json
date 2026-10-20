@@ -1,0 +1,21 @@
+
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "Entre Mitos e Raizes - JavaFX 27",
+      "request": "launch",
+      "mainClass": "br.com.raizes.Main",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "vmArgs": [
+        "--module-path",
+        "${workspaceFolder}/lib/javafx-sdk-27/lib",
+        "--add-modules",
+        "javafx.controls,javafx.fxml,javafx.swing,javafx.media",
+        "--enable-native-access=javafx.graphics,javafx.media"
+      ]
+    }
+  ]
+}

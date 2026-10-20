@@ -1,0 +1,66 @@
+# Vídeos da campanha
+
+As sequências são configuradas em [`Videos/cinematics.properties`](../Videos/cinematics.properties). O arquivo usa UTF-8 e é lido ao iniciar o jogo. Não é necessário alterar ou recompilar o Java para mudar a lista de vídeos; reinicie o jogo após editar a configuração.
+
+## Adicionar uma cena
+
+1. Coloque o arquivo MP4 em `Videos/` ou em uma subpasta.
+2. Adicione o caminho em `cinematics.properties`, relativo à raiz do projeto.
+3. Acrescente uma legenda se desejar.
+
+Para adicionar uma cena ao prólogo:
+
+```properties
+prologue.3.video=Videos/cena3.mp4
+prologue.3.caption=Texto apresentado durante a terceira cena.
+```
+
+Para reproduzir duas cenas antes do capítulo do Saci:
+
+```properties
+chapter.2.1.video=Videos/capitulo2/entrada.mp4
+chapter.2.1.caption=O caminho do Saci começa aqui.
+chapter.2.2.video=Videos/capitulo2/travessia.mp4
+```
+
+| Prefixo | Quando é reproduzido |
+| --- | --- |
+| `prologue` | Ao criar uma nova campanha, antes do primeiro capítulo. |
+| `chapter.1` | Antes da introdução do Curupira. |
+| `chapter.2` | Antes da introdução do Saci. |
+| `chapter.3` | Antes da introdução da Caipora. |
+| `chapter.4` | Antes da introdução do Negrinho do Pastoreio. |
+
+O número após o prefixo define a ordem da cena. A ordenação é numérica: `2` vem antes de `10`, e os números não precisam ser consecutivos. A propriedade `.caption` é opcional; cenas sem legenda exibem o vídeo sem o painel de texto.
+
+## Reprodução e continuidade
+
+- Um capítulo sem vídeos configurados abre diretamente sua introdução.
+- Os vídeos do capítulo são exibidos ao chegar à fase e ao reiniciá-la pela seleção de fases. Continuar um save abre a introdução da fase, sem repetir os vídeos.
+- `Enter`, `Espaço` ou clique avança uma cena; `Esc` pula a sequência atual.
+- Arquivos ausentes ou inválidos geram um aviso e são pulados. O erro detalhado, com o caminho do arquivo, aparece no terminal.
+- Se uma cena não iniciar em 12 segundos, o jogo continua para a seguinte.
+- Falhas nativas de tipo `UNKNOWN` recebem uma nova tentativa após 200 ms antes de a cena ser pulada.
+- O player anterior é liberado a cada troca de cena. Eventos atrasados não avançam a sequência nova.
+
+## Formato dos arquivos
+
+Use MP4 com vídeo **H.264/AVC**. Para arquivos com som, o formato de áudio previsto pelo JavaFX é **AAC**, sujeito ao suporte do ambiente. Consulte os [formatos aceitos pelo JavaFX](https://openjfx.io/javadoc/27/javafx.media/javafx/scene/media/package-summary.html).
+
+Os arquivos `cena1.mp4` e `cena2.mp4` continham faixas AAC silenciosas que provocavam `ERROR_MEDIA_INVALID` no ambiente analisado. Essas faixas foram removidas, preservando o fluxo de vídeo original, sem recodificação ou perda de qualidade da imagem. A reprodução completa das duas cenas foi verificada com JavaFX 25.0.1 e 27.
+
+## Verificar a reprodução
+
+Os testes usam o decoder real do JavaFX e não abrem uma janela nem alteram saves. Com JDK 27, execute na raiz do projeto:
+
+```powershell
+.\scripts\test-cinematics.ps1
+```
+
+Para verificar com JavaFX 25.0.1:
+
+```powershell
+.\scripts\test-cinematics.ps1 -JavaFxPath 'lib/javafx'
+```
+
+Os testes cobrem a leitura de sequências por capítulo, a ordem numérica, as legendas UTF-8, a reprodução completa das duas cenas incluídas, o avanço manual, a troca de sequência e a recuperação de arquivos ausentes ou corrompidos. Os avisos exibidos durante o teste de recuperação são esperados.

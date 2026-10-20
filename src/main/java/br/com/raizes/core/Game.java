@@ -7,6 +7,8 @@ import br.com.raizes.model.Thing;
 import br.com.raizes.model.TreeDecoration;
 import br.com.raizes.assets.AssetManager;
 import br.com.raizes.audio.CinematicManager;
+import br.com.raizes.audio.CinematicCatalog;
+import br.com.raizes.audio.CinematicScene;
 import br.com.raizes.persistence.SaveManager;
 import br.com.raizes.quiz.QuestionBank;
 import static br.com.raizes.config.GameConfig.*;
@@ -48,14 +50,6 @@ public final class Game extends JPanel {
 
 
 
-    private static final String[] OPENING_VIDEOS = { "Videos/cena1.mp4", "Videos/cena2.mp4", "Videos/cena3.mp4", "Videos/cena4.mp4" };
-    private static final String[] OPENING_NARRATION = {
-        "O fogo avançava rápido demais pelas copas das árvores. Onde antes havia o verde vivo e o som da floresta, resta apenas a fumaça e o calor sufocante.",
-        "Guiado pelo dever e pela coragem, o pequeno guardião avança entre as brasas. Sem hesitar, ele alcança o filhote assustado entre os galhos em chamas e o acolhe em seus braços.",
-        "De repente, a terra sob os seus pés começa a brilhar com uma luz ancestral. A fumaça dissipa-se num turbilhão de energia e o pequeno guardião é envolvido por uma força mágica que o transporta para além dos limites deste mundo.",
-        "À sua espera estão as lendárias criaturas do folclore. Sob o olhar atento do Curupira, da Caipora e das entidades protetoras da natureza, ele inicia a sua jornada de aprendizagem. Ali, entre segredos antigos e rituais esquecidos, ele deixará de ser apenas um protetor comum para se tornar um verdadeiro Guardião da Floresta."
-    };
-
     final Set<Integer> held = new HashSet<>();
     final List<Rectangle> platforms = new ArrayList<>();
     final List<Thing> coins = new ArrayList<>();
@@ -67,6 +61,7 @@ public final class Game extends JPanel {
     final Map<Integer, BufferedImage> platformArtwork = new java.util.HashMap<>();
     final Timer timer;
     final SaveManager saveManager = new SaveManager();
+    final CinematicCatalog cinematicCatalog = new CinematicCatalog();
     final CinematicManager cinematicManager;
     final WorldRenderer worldRenderer;
     volatile GameState screen = GameState.MENU;
@@ -113,7 +108,7 @@ public final class Game extends JPanel {
         setLayout(null);
         setBackground(Color.BLACK);
         setOpaque(true);
-        cinematicManager = new CinematicManager(OPENING_VIDEOS, OPENING_NARRATION, this::showToast, this::finishOpening);
+        cinematicManager = new CinematicManager(this::showToast);
         worldRenderer = new WorldRenderer(this);
         add(cinematicManager.panel());
         addComponentListener(new ComponentAdapter() {
@@ -123,7 +118,10 @@ public final class Game extends JPanel {
         loadImages();
         buildLevel();
         addKeyListener(new KeyAdapter() {
-            @Override public void keyPressed(KeyEvent e) { held.add(e.getKeyCode()); keyPressedGame(e.getKeyCode()); }
+            @Override public void keyPressed(KeyEvent e) {
+                boolean firstPress = held.add(e.getKeyCode());
+                if (screen != GameState.CINEMATIC || firstPress) keyPressedGame(e.getKeyCode());
+            }
             @Override public void keyReleased(KeyEvent e) { held.remove(e.getKeyCode()); }
             @Override public void keyTyped(KeyEvent e) {
                 if (screen == GameState.NAME && !nameConfirm && name.length() < 18) {
@@ -302,7 +300,6 @@ public final class Game extends JPanel {
     private void tick() {
         double dt = 0.016;
         elapsed += dt;
-        cinematicManager.setVisible(screen == GameState.CINEMATIC);
         updateMenuScale();
         if (screen == GameState.WORLD) updateWorld(dt);
         if (toastUntil < System.currentTimeMillis()) toast = "";
@@ -506,7 +503,7 @@ public final class Game extends JPanel {
         loadSave(selectedSaveSlot);
         currentPhase = phase;
         x = 110; y = 500; vy = 0; lives = 3; coinsCollected = 0; bucketFull = false; campaignComplete = false;
-        buildLevel(); camera = 0; saveGame(); openPhaseIntro();
+        buildLevel(); camera = 0; saveGame(); startChapter();
     }
 
     private void saveConfirmKey(int key) {
@@ -692,7 +689,7 @@ public final class Game extends JPanel {
             currentPhase++;
             x = 110; y = 500; vy = 0; lives = 3; coinsCollected = 0;
             buildLevel();
-            openPhaseIntro();
+            startChapter();
         } else {
             unlockedPhase = Phase.values().length - 1;
             campaignComplete = true;
@@ -717,11 +714,32 @@ public final class Game extends JPanel {
         walkingFrame = 0;
         exitBlocked = false;
     }
-    private void startOpening() { screen = GameState.CINEMATIC; cinematicManager.start(); }
+    private void startOpening() {
+        playCinematic(cinematicCatalog.prologue(), "PRÓLOGO", this::startChapter);
+    }
 
-    private void finishOpening() {
-        openPhaseIntro();
-        repaint();
+    private void startChapter() {
+        playCinematic(cinematicCatalog.beforeChapter(currentPhase + 1),
+            "CAPÍTULO " + (currentPhase + 1) + " • " + Phase.values()[currentPhase].guardian,
+            this::openPhaseIntro);
+    }
+
+    private void playCinematic(List<CinematicScene> playlist, String heading, Runnable next) {
+        if (playlist.isEmpty()) { next.run(); return; }
+        held.clear();
+        screen = GameState.CINEMATIC;
+        cinematicManager.start(playlist, heading, () -> {
+            held.clear();
+            next.run();
+            if (screen != GameState.CINEMATIC) requestFocusInWindow();
+            repaint();
+        });
+    }
+
+    @Override public void removeNotify() {
+        timer.stop();
+        cinematicManager.dispose();
+        super.removeNotify();
     }
     void drawText(Graphics2D g, String text, int x, int y, int size, Color color) { g.setFont(new Font(Font.SANS_SERIF, Font.BOLD, Math.max(12, size + textScale * 2))); g.setColor(color); g.drawString(text, x, y); }
     private Color ink() { return contrast ? Color.WHITE : new Color(25, 48, 51); }

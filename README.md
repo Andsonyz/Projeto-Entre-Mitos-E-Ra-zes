@@ -1,43 +1,106 @@
 # Entre Mitos e Raízes
 
-Jogo 2D de plataforma lateral feito em Java Swing, com reprodução de vídeo pelo JavaFX Media.
+Jogo educativo de plataforma 2D inspirado no folclore brasileiro. Explore a floresta, cumpra desafios ambientais e aprenda com Curupira, Saci, Caipora e Negrinho do Pastoreio.
 
-## Requisitos
+Desenvolvido em **Java**, com **Swing/AWT** para a interface e **JavaFX Media** para os vídeos.
 
-- Windows e JDK 25 instalado e disponível no `PATH` (`java` e `javac`).
-- Bibliotecas JavaFX 25 para Windows em `lib/javafx/`.
-- Pastas `Image/` e `Videos/` na raiz do projeto. As imagens adicionais da interface ficam em `src/main/resources/`.
+## Funcionalidades
 
-## Executar
+- Quatro fases com objetivos, diálogos e desafios educativos.
+- Dois slots de save, continuação da campanha e seleção de fases desbloqueadas.
+- Prólogo em vídeo, mapa de progresso e menu de pausa.
+- Ajustes de tamanho do texto e alto contraste.
 
-Execute `run.bat`. O script compila automaticamente todos os arquivos Java, copia imagens e vídeos para `out/` e inicia o jogo. Os arquivos de saída em `out/` podem ser recriados a qualquer momento.
+## Requisitos e compatibilidade
 
-Ao distribuir o projeto, inclua `src/`, `Image/`, `Videos/`, `lib/javafx/`, `run.bat` e este README. Os saves são criados fora do projeto em `%USERPROFILE%\.entremitoseraizes\saves`.
+O projeto está configurado para **Windows** e possui duas opções de execução:
+
+| Opção | JDK | JavaFX | Local das bibliotecas |
+| --- | --- | --- | --- |
+| Script `run.bat` | 25 ou superior | 25.0.1 | `lib/javafx/` |
+| VS Code | 27 | 27 | `lib/javafx-sdk-27/lib/` |
+
+A compilação e a reprodução das duas cenas foram verificadas com **JDK 27 nas duas versões do JavaFX**. Com JavaFX 25.0.1, também foi verificada a compilação com `--release 25`. A execução no JDK 25 não foi testada.
+
+Mantenha as pastas `Image/`, `Videos/` e `src/main/resources/` nos locais originais. O projeto compila diretamente com `javac`, sem Maven ou Gradle.
+
+## Como executar
+
+### Pelo VS Code
+
+1. Abra a pasta raiz do projeto no VS Code, com o suporte a Java instalado.
+2. Confira o caminho do JDK 27 em `.vscode/settings.json`.
+3. Verifique se o SDK JavaFX 27 está em `lib/javafx-sdk-27/`.
+4. Em **Executar e Depurar**, selecione **Entre Mitos e Raizes - JavaFX 27** e pressione **F5**.
+
+O arquivo `.vscode/launch.json` define a classe principal, os módulos JavaFX e o diretório de execução.
+
+### Pelo terminal
+
+Com `java` e `javac` da mesma versão no `PATH` e o JavaFX 25.0.1 em `lib/javafx/`, execute na raiz do projeto:
+
+```powershell
+.\run.bat
+```
+
+O script compila os fontes, copia os recursos para `out/` e inicia o jogo. Ele utiliza **JavaFX 25.0.1**, mesmo quando o JDK instalado é o 27.
 
 ## Controles
 
-- `A/D` ou setas: correr
-- `W`, seta para cima ou `Espaço`: pular
-- `Enter`: confirmar e avançar diálogos
-- `M`: abrir ou fechar o mapa
-- `F5`: salvar no slot atual
-- `Esc`: pausar ou voltar
-- `Delete`: excluir o slot selecionado
+| Tecla ou ação | Função |
+| --- | --- |
+| `A` / `D` ou setas laterais | Mover o personagem |
+| `W`, seta para cima ou `Espaço` | Pular |
+| `Enter` | Confirmar e avançar diálogos |
+| `E` | Interagir com armadilhas, fontes e focos de incêndio; avançar diálogos |
+| `M` | Abrir ou fechar o mapa |
+| `F5` | Salvar durante a exploração |
+| `Esc` | Pausar ou voltar |
+| `1` a `4` | Selecionar uma resposta no quiz; confirmar com `Enter` ou `Espaço` |
+| `Delete` / `R` | Excluir / reiniciar a campanha do slot selecionado, após confirmação |
+| Mouse | Navegar pelas telas e interagir com elementos próximos |
 
-## Sistemas
+## Campanha
 
-A campanha tem quatro fases, cada uma com introdução, retrato e lenda do guardião, objetivo próprio, diálogo educativo e desafio:
+| Fase | Guardião | Objetivo |
+| --- | --- | --- |
+| Os Rastros da Caça | Curupira | Coletar 12 sementes e desativar 3 armadilhas. |
+| A Travessia do Saci | Saci | Atravessar plataformas e obstáculos. |
+| Entre Cinzas e Raízes | Caipora | Encher o balde nas fontes e apagar todos os focos. |
+| Os Rastros do Lixo | Negrinho do Pastoreio | Recolher 10 resíduos. |
 
-1. Os Rastros da Caça — Curupira: encontre sementes e desative armadilhas.
-2. A Travessia do Saci — Saci: atravesse plataformas e vãos.
-3. Entre Cinzas e Raízes — Caipora: encha o balde nas fontes e apague os focos com `E`.
-4. Os Rastros do Lixo — Negrinho do Pastoreio: recolha resíduos e conclua a campanha.
+Cada fase apresenta a lenda do guardião e termina com um diálogo e um quiz. São sorteadas cinco perguntas por rodada, de um banco de oito por fase. Uma resposta incorreta reinicia a rodada.
 
-O jogo também inclui dois slots locais, continuar campanha, apelido, pausa, mapa de progresso, configurações, controles, extras e quiz.
+### Vídeos antes dos capítulos
 
-## Prólogo em vídeo
+Os vídeos `Videos/cena1.mp4` e `Videos/cena2.mp4` compõem o prólogo. Para adicionar cenas ao prólogo ou antes de cada capítulo, edite **[`Videos/cinematics.properties`](Videos/cinematics.properties)**:
 
-Ao criar uma campanha, as cenas são reproduzidas dentro da janela, com narração na parte inferior. Cada cena avança quando o vídeo termina; `Enter` ou `Espaço` avança manualmente e `Esc` pula o prólogo.
+```properties
+chapter.2.1.video=Videos/capitulo2/entrada.mp4
+chapter.2.1.caption=O caminho do Saci começa aqui.
+```
 
-- `Videos/cena1.mp4` e `Videos/cena2.mp4` estão incluídos.
-- `Videos/cena3.mp4` e `Videos/cena4.mp4` são opcionais e entram automaticamente na sequência quando adicionados.
+`Enter`, `Espaço` ou clique avança uma cena; `Esc` pula a sequência atual. Veja o [guia de vídeos](docs/VIDEOS.md) para formatos, exemplos e testes.
+
+### Progresso salvo
+
+Os dois slots são armazenados em `%USERPROFILE%\.entremitoseraizes\saves`, nos arquivos `slot-1.properties` e `slot-2.properties`. Eles registram a fase, as fases desbloqueadas, a posição, as vidas e os objetivos concluídos.
+
+## Organização do código
+
+Os fontes ficam em `src/main/java/br/com/raizes/`:
+
+| Componente | Responsabilidade |
+| --- | --- |
+| `Main.java` | Inicialização da janela e do jogo. |
+| `core/` | Loop, física, telas e campanha em `Game`; estados em `GameState`; desenho do mundo em `WorldRenderer`. |
+| `audio/` | Sequências em `CinematicCatalog`, cenas em `CinematicScene` e reprodução em `CinematicManager`. |
+| `assets/AssetManager.java` | Carregamento de imagens e localização de arquivos. |
+| `config/GameConfig.java` | Dimensões, constantes e filtros visuais. |
+| `model/` | Definições das fases, perguntas e objetos do cenário. |
+| `persistence/SaveManager.java` | Leitura, gravação e exclusão dos saves. |
+| `quiz/QuestionBank.java` | Banco de perguntas de cada fase. |
+
+Os recursos visuais ficam em `Image/` e `src/main/resources/`; os vídeos, em `Videos/`. A pasta `out/` contém arquivos gerados pela compilação e é ignorada pelo Git.
+
+Para adicionar fases, revise as regras em `Game`, os desenhos em `WorldRenderer`, as definições em `Phase` e as perguntas em `QuestionBank`. Os saves usam índices de fases e de objetos; alterações nessa ordem exigem atenção à compatibilidade com campanhas existentes.

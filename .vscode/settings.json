@@ -1,10 +1,19 @@
 
 {
-    "java.configuration.runtimes": [
-        {
-            "name": "JavaSE-27",
-            "path": "C:\\Program Files\\Java\\jdk-27",
-            "default": true
-        }
-    ]
+  "java.configuration.runtimes": [
+    {
+      "name": "JavaSE-27",
+      "path": "C:\\Program Files\\Java\\jdk-27",
+      "default": true
+    }
+  ],
+  "java.project.sourcePaths": [
+    "src/main/java"
+  ],
+  "java.project.outputPath": "out",
+  "java.project.referencedLibraries": [
+    "lib/javafx-sdk-27/lib/*.jar",
+    "lib/*.jar"
+  ],
+  "java.errors.incompleteClasspath.severity": "warning"
 }

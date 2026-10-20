@@ -44,4 +44,4 @@ if exist "%PROJECT_DIR%src\main\resources" xcopy "%PROJECT_DIR%src\main\resource
 if exist "%PROJECT_DIR%Videos" xcopy "%PROJECT_DIR%Videos" "%OUTPUT_DIR%\Videos" /E /I /Y >nul
 
 cd /d "%PROJECT_DIR%"
-java -cp "%OUTPUT_DIR%" --module-path "%PROJECT_DIR%lib\javafx" --add-modules "%JAVAFX_MODULES%" br.com.raizes.Main
+java -cp "%OUTPUT_DIR%" --module-path "%PROJECT_DIR%lib\javafx" --add-modules "%JAVAFX_MODULES%" --enable-native-access=javafx.graphics,javafx.media br.com.raizes.Main
