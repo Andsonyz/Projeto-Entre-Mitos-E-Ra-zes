@@ -11,14 +11,23 @@ import java.nio.file.StandardCopyOption;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Objects;
 
 /** Reads and writes the two campaign save slots. */
 public final class SaveManager {
-    private final File directory = new File(System.getProperty("user.home"), ".entremitoseraizes/saves");
+    private final File directory;
     private final Map<Integer, CachedSlot> cache = new HashMap<>();
 
+    public SaveManager() {
+        this(Path.of(System.getProperty("user.home"), ".entremitoseraizes", "saves"));
+    }
+
+    /** Allows isolated save directories for tests and alternate launchers. */
+    public SaveManager(Path directory) {
+        this.directory = Objects.requireNonNull(directory).toFile();
+    }
+
     public synchronized Properties read(int slot) {
-        fileFor(slot); // Validate the slot before consulting the cache.
         File file = fileFor(slot);
         long modified = file.isFile() ? file.lastModified() : -1;
         long length = file.isFile() ? file.length() : -1;

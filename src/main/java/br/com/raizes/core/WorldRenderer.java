@@ -113,7 +113,7 @@ final class WorldRenderer {
     }
 
     private void drawObjective(Graphics2D g, Thing item) {
-        int itemY = game.currentPhase == 3 ? item.y : (int) (420 + Math.sin(game.elapsed * 3 + item.x) * 30);
+        int itemY = game.coinY(item);
         if (game.currentPhase == 3) {
             g.setColor(new Color(74, 98, 57)); g.fillRoundRect(item.x - 11, itemY, 22, 18, 4, 4);
             g.setColor(new Color(218, 199, 151)); g.fillRect(item.x - 8, itemY + 4, 16, 10);
@@ -125,14 +125,7 @@ final class WorldRenderer {
     }
 
     private void drawPlayer(Graphics2D g) {
-        int px = (int) game.x, py = (int) game.y + 5;
-        BufferedImage image = game.walking ? ((game.walkingFrame / 8) % 2 == 0 ? game.playerWalk1 : game.playerWalk2) : game.playerImage;
-        if (image != null) {
-            if (game.facingRight) g.drawImage(image, px - 8, py - 20, 58, 78, game);
-            else g.drawImage(image, px + 50, py - 20, px - 8, py + 58, 0, 0, image.getWidth(), image.getHeight(), game);
-        } else {
-            g.setColor(new Color(217, 92, 70)); g.fillOval(px, py, 38, 38);
-            g.setColor(new Color(242, 177, 139)); g.fillOval(px + 5, py - 17, 28, 28);
-        }
+        game.playerAnimator.draw(g, game.x + 2 + PLAYER_WIDTH / 2.0, game.y + PLAYER_HEIGHT,
+            PLAYER_DRAW_WIDTH, PLAYER_DRAW_HEIGHT, game.facingRight);
     }
 }

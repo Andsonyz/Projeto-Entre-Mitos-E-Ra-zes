@@ -36,18 +36,23 @@ O número após o prefixo define a ordem da cena. A ordenação é numérica: `2
 ## Reprodução e continuidade
 
 - Um capítulo sem vídeos configurados abre diretamente sua introdução.
-- Os vídeos do capítulo são exibidos ao chegar à fase e ao reiniciá-la pela seleção de fases. Continuar um save abre a introdução da fase, sem repetir os vídeos.
-- `Enter`, `Espaço` ou clique avança uma cena; `Esc` pula a sequência atual.
-- Arquivos ausentes ou inválidos geram um aviso e são pulados. O erro detalhado, com o caminho do arquivo, aparece no terminal.
-- Se uma cena não iniciar em 12 segundos, o jogo continua para a seguinte.
-- Falhas nativas de tipo `UNKNOWN` recebem uma nova tentativa após 200 ms antes de a cena ser pulada.
-- O player anterior é liberado a cada troca de cena. Eventos atrasados não avançam a sequência nova.
+- O novo jogo abre a seleção de personagem antes do prólogo. Os vídeos do capítulo aparecem ao chegar à fase e ao reiniciá-la pela seleção de fases.
+- Apenas `MediaPlayer.onEndOfMedia`, após a reprodução começar, conclui uma cena. Todas as cenas precisam terminar antes da apresentação da fase. `Enter`, `Espaço` e cliques não antecipam esse término.
+- Física, controles, inimigos, animações e relógio da fase ficam suspensos durante carregamento e reprodução. A localização do arquivo acontece fora das threads da interface; um indicador mostra o carregamento.
+- O último frame permanece no player até o callback preparar a próxima tela. O player anterior é liberado na troca de cena ou ao sair. Identificadores de sessão/cena descartam callbacks repetidos ou antigos.
+- `Esc` cancela sem liberar a fase: retorna à seleção no prólogo de um novo jogo, ou ao menu nas sequências retomadas e nos capítulos.
+- Arquivos ausentes, incompatíveis ou com falha exibem **Tentar novamente** e **Voltar**. O erro detalhado aparece no terminal. Mouse e teclado podem usar os botões; `Esc` volta e `Enter` tenta novamente quando nenhum botão tem foco.
+- O limite de 12 segundos detecta falha de preparação ou travamento; nunca conclui a cena. Falhas nativas `UNKNOWN` recebem uma tentativa automática após 200 ms; se persistirem, a recuperação fica a cargo do usuário.
+- Os campos `pendingPrologue` e `pendingChapter` no save permanecem ativos até a conclusão natural. Cancelar, falhar ou fechar o jogo mantém a sequência pendente. **Continuar** recomeça a sequência pendente desde sua primeira cena. Após concluída, ela não se repete ao continuar.
+- Saves antigos sem esses campos conservam o comportamento anterior de retomada, abrindo a apresentação da fase. Não há novo formato ou arquivo de save.
 
 ## Formato dos arquivos
 
 Use MP4 com vídeo **H.264/AVC**. Para arquivos com som, o formato de áudio previsto pelo JavaFX é **AAC**, sujeito ao suporte do ambiente. Consulte os [formatos aceitos pelo JavaFX](https://openjfx.io/javadoc/27/javafx.media/javafx/scene/media/package-summary.html).
 
 Os arquivos `cena1.mp4` e `cena2.mp4` continham faixas AAC silenciosas que provocavam `ERROR_MEDIA_INVALID` no ambiente analisado. Essas faixas foram removidas, preservando o fluxo de vídeo original, sem recodificação ou perda de qualidade da imagem. A reprodução completa das duas cenas foi verificada com JavaFX 25.0.1 e 27.
+
+Nas verificações atuais houve falhas nativas `UNKNOWN / ERROR_MEDIA_INVALID` intermitentes, inclusive com arquivos válidos que reproduziram integralmente em outras execuções. O tratamento não considera esse erro como fim do vídeo: tenta reinicializar o decoder uma vez e, se necessário, apresenta a recuperação. A causa nativa não foi determinada; a disponibilidade do decoder no computador de destino ainda precisa de observação em janela.
 
 ## Verificar a reprodução
 
@@ -63,4 +68,4 @@ Para verificar com JavaFX 25.0.1:
 .\scripts\test-cinematics.ps1 -JavaFxPath 'lib/javafx'
 ```
 
-Os testes cobrem a leitura de sequências por capítulo, a ordem numérica, as legendas UTF-8, a reprodução completa das duas cenas incluídas, o avanço manual, a troca de sequência e a recuperação de arquivos ausentes ou corrompidos. Os avisos exibidos durante o teste de recuperação são esperados.
+Os testes cobrem a leitura de sequências por capítulo, a ordem numérica, as legendas UTF-8, a reprodução integral das duas cenas, o bloqueio do avanço manual, a conclusão única, o cancelamento, os callbacks antigos e a recuperação de arquivos ausentes ou corrompidos. A suíte completa também verifica suspensão da fase e retomada de vídeos pendentes pelo save. Os avisos de arquivo ausente/corrompido são esperados nos testes de recuperação.
