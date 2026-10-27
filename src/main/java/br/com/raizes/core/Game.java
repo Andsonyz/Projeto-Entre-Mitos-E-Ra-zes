@@ -75,6 +75,7 @@ public final class Game extends JPanel {
     final PlayerAnimator characterPreview = new PlayerAnimator(CharacterDefinition.MALE);
     PlayerAnimator playerAnimator = new PlayerAnimator(CharacterDefinition.MALE);
     BufferedImage platformImage;
+    BufferedImage seedImage, trashImage, trapImage, lakeImage, fireImage;
     BufferedImage slotTitleImage;
     BufferedImage nameTitleImage;
     BufferedImage nameTitleArtwork;
@@ -95,6 +96,11 @@ public final class Game extends JPanel {
     private int selectedSaveSlot;
     private int pendingPhase;
     int currentPhase, unlockedPhase;
+    private Thing activeTrap;
+    private int trapChallengeStage;
+    private double trapBallPosition, trapBallDirection, trapChallengeSpeed, trapTargetCenter, trapTargetHalfWidth;
+    private String trapChallengeMessage = "";
+    private long trapChallengeMessageUntil;
     private int textScale = 1;
     private boolean contrast, nameConfirm, onGround, exitBlocked, campaignComplete, choosingContinue;
     private boolean pendingPrologue, pendingChapter;
@@ -134,7 +140,8 @@ public final class Game extends JPanel {
         addKeyListener(new KeyAdapter() {
             @Override public void keyPressed(KeyEvent e) {
                 boolean firstPress = held.add(e.getKeyCode());
-                if (screen != GameState.CINEMATIC || firstPress) keyPressedGame(e.getKeyCode());
+                if ((screen != GameState.CINEMATIC && screen != GameState.TRAP_CHALLENGE) || firstPress)
+                    keyPressedGame(e.getKeyCode());
             }
             @Override public void keyReleased(KeyEvent e) { held.remove(e.getKeyCode()); }
             @Override public void keyTyped(KeyEvent e) {
@@ -170,6 +177,11 @@ public final class Game extends JPanel {
         treeImages[0] = loadTree("Image/Cenarios/Elementos/arvore01.png");
         treeImages[1] = loadTree("Image/Cenarios/Elementos/arvore02.png");
         treeImages[2] = loadTree("Image/Cenarios/Elementos/arvore03.png");
+        seedImage = cropOpaqueImage(image("Image/Cenarios/Elementos/semente.png"));
+        trashImage = cropOpaqueImage(image("Image/Cenarios/Elementos/lixo.png"));
+        trapImage = cropOpaqueImage(image("Image/Cenarios/Elementos/armadilha.png"));
+        lakeImage = cropOpaqueImage(image("Image/Cenarios/Elementos/lago.png"));
+        fireImage = cropOpaqueImage(image("Image/Cenarios/Elementos/fogo.png"));
         BufferedImage groundSource = image("Image/Cenarios/Elementos/chao.png");
         if (groundSource != null) {
             int renderHeight = 120 + GROUND_OVERDRAW;
@@ -241,26 +253,61 @@ public final class Game extends JPanel {
     private void buildLevel() {
         platforms.clear(); coins.clear(); enemies.clear(); fires.clear(); traps.clear(); trees.clear(); platformArtwork.clear();
         if (currentPhase == 1) {
-            platforms.add(new Rectangle(0, 600, 710, 120));
-            platforms.add(new Rectangle(820, 600, 610, 120));
-            platforms.add(new Rectangle(1540, 600, 690, 120));
-            platforms.add(new Rectangle(2370, 600, WORLD_W - 2370, 120));
-        } else platforms.add(new Rectangle(0, 600, WORLD_W, 120));
-        int[][] ledges = currentPhase == 1
-            ? new int[][] { {300, 510, 150, 25}, {500, 455, 145, 25}, {720, 390, 150, 25}, {940, 470, 145, 25}, {1160, 405, 150, 25}, {1390, 335, 145, 25}, {1630, 420, 155, 25}, {1880, 350, 145, 25}, {2130, 450, 160, 25}, {2380, 380, 150, 25}, {2650, 315, 145, 25} }
-            : new int[][] { {330, 500, 190, 28}, {640, 430, 190, 28}, {960, 520, 220, 28}, {1320, 450, 210, 28}, {1640, 370, 190, 28}, {1980, 500, 230, 28}, {2310, 420, 220, 28}, {2630, 520, 180, 28} };
-        for (int[] p : ledges) platforms.add(new Rectangle(p[0], p[1], p[2], p[3]));
+            platforms.add(new Rectangle(0, GROUND_Y, 710, 120));
+            platforms.add(new Rectangle(820, GROUND_Y, 610, 120));
+            platforms.add(new Rectangle(1540, GROUND_Y, 690, 120));
+            platforms.add(new Rectangle(2370, GROUND_Y, WORLD_W - 2370, 120));
+        } else platforms.add(new Rectangle(0, GROUND_Y, WORLD_W, 120));
+        int[][] ledges = switch (currentPhase) {
+            case 0 -> new int[][] {
+                {260, 500, 175, 22}, {500, 445, 130, 28}, {760, 390, 190, 24},
+                {1040, 470, 135, 34}, {1280, 410, 180, 26}, {1570, 345, 150, 30},
+                {1840, 425, 210, 24}, {2170, 370, 160, 32}, {2440, 455, 220, 22},
+                {2780, 390, 180, 30}
+            };
+            case 1 -> new int[][] {
+                {300, 510, 160, 25}, {520, 450, 210, 32}, {800, 385, 135, 23},
+                {1010, 470, 210, 34}, {1300, 410, 145, 27}, {1540, 330, 195, 28},
+                {1810, 420, 150, 34}, {2050, 350, 220, 26}, {2340, 445, 150, 30},
+                {2590, 375, 210, 24}, {2880, 500, 140, 32}
+            };
+            case 2 -> new int[][] {
+                {240, 480, 210, 26}, {590, 415, 150, 34}, {850, 505, 220, 22},
+                {1210, 450, 140, 30}, {1490, 360, 220, 28}, {1850, 430, 165, 24},
+                {2140, 505, 210, 32}, {2500, 420, 150, 26}, {2780, 340, 200, 30}
+            };
+            default -> new int[][] {
+                {210, 520, 240, 34}, {570, 455, 140, 22}, {830, 390, 210, 30},
+                {1170, 500, 150, 26}, {1450, 430, 200, 34}, {1780, 350, 170, 24},
+                {2070, 475, 240, 32}, {2460, 405, 150, 22}, {2730, 520, 200, 30}
+            };
+        };
+        for (int[] p : ledges) platforms.add(new Rectangle(p[0], p[1] + WORLD_VERTICAL_SHIFT, p[2], p[3]));
         if (currentPhase == 0) {
             int[] seedXs = { 360, 420, 675, 735, 1010, 1080, 1370, 1450, 1690, 1750, 2030, 2110, 2360, 2440, 2680, 2750, 2940 };
             for (int itemX : seedXs) coins.add(new Thing(itemX, 0));
-            traps.add(new Thing(850, 560)); traps.add(new Thing(1770, 560)); traps.add(new Thing(2550, 560));
+            traps.add(new Thing(850, GROUND_Y - 40)); traps.add(new Thing(1770, GROUND_Y - 40)); traps.add(new Thing(2550, GROUND_Y - 40));
             enemies.add(new Thing(760, 0)); enemies.add(new Thing(1500, 0)); enemies.add(new Thing(2180, 0)); enemies.add(new Thing(2820, 0));
         } else if (currentPhase == 1) {
             enemies.add(new Thing(570, 0)); enemies.add(new Thing(1260, 0)); enemies.add(new Thing(2030, 0)); enemies.add(new Thing(2730, 0));
         } else if (currentPhase == 2) {
-            fires.add(new Thing(690, 558)); fires.add(new Thing(1190, 558)); fires.add(new Thing(1800, 558)); fires.add(new Thing(2490, 558));
+            // Keep the original four first so previously saved fire progress keeps its meaning.
+            int[][] fireLocations = {
+                {690, GROUND_Y - 42}, {1190, GROUND_Y - 42},
+                {1800, GROUND_Y - 42}, {2490, GROUND_Y - 42},
+                {350, 480 + WORLD_VERTICAL_SHIFT + PLATFORM_SURFACE_OFFSET - 42},
+                {950, 505 + WORLD_VERTICAL_SHIFT + PLATFORM_SURFACE_OFFSET - 42},
+                {1500, 360 + WORLD_VERTICAL_SHIFT + PLATFORM_SURFACE_OFFSET - 42},
+                {2200, 505 + WORLD_VERTICAL_SHIFT + PLATFORM_SURFACE_OFFSET - 42},
+                {2900, 340 + WORLD_VERTICAL_SHIFT + PLATFORM_SURFACE_OFFSET - 42}
+            };
+            for (int[] fire : fireLocations) fires.add(new Thing(fire[0], fire[1]));
         } else {
-            int[][] litter = { {360,552}, {610,538}, {835,560}, {1080,532}, {1320,550}, {1590,540}, {1880,562}, {2160,535}, {2440,550}, {2740,538}, {2960,558} };
+            int[][] litter = {
+                {300, 570}, {640, 505}, {930, 440}, {1120, GROUND_Y - 24},
+                {1240, 550}, {1530, 480}, {1830, 400}, {2200, 525},
+                {2530, 455}, {2800, 570}, {3100, GROUND_Y - 24}
+            };
             for (int[] item : litter) coins.add(new Thing(item[0], item[1]));
         }
         bucketFull = false;
@@ -314,6 +361,7 @@ public final class Game extends JPanel {
         lastTickNanos = now;
         updateMenuScale();
         if (screen == GameState.WORLD) updateWorld(dt);
+        else if (screen == GameState.TRAP_CHALLENGE) updateTrapChallenge(dt);
         if (toastUntil < System.currentTimeMillis()) toast = "";
         repaint();
     }
@@ -352,13 +400,34 @@ public final class Game extends JPanel {
         }
         if (y > H + 100) loseLife();
         for (Thing coin : coins) if (!coin.hit && body.intersects(new Rectangle(coin.x - 12, coinY(coin), 24, 24))) { coin.hit = true; coinsCollected++; }
+        if (currentPhase == 2) {
+            for (Thing fire : fires) {
+                if (fire.hit) continue;
+                Rectangle flameBounds = new Rectangle(fire.x - 30, fire.y - 30, 60, 72);
+                if (body.intersects(flameBounds)) {
+                    loseLife();
+                    showToast("As chamas te atingiram! Tente apagá-las de uma distância segura.");
+                    return;
+                }
+            }
+        }
         for (Thing enemy : enemies) {
             if (enemy.hit) continue;
             enemy.x += (int) Math.round(Math.sin(elapsed + enemy.x) * ENEMY_SPEED);
-            Rectangle enemyRect = new Rectangle(enemy.x - 20, 552, 40, 48);
+            int enemyY = GROUND_Y - 48;
+            Rectangle enemyRect = new Rectangle(enemy.x - 20, enemyY, 40, 48);
             if (body.intersects(enemyRect)) {
-                if (vy > 0 && y + PLAYER_HEIGHT < 575) { enemy.hit = true; vy = -360; }
-                else loseLife();
+                boolean stompedFromAbove = vy >= 0 && oldY + PLAYER_HEIGHT <= enemyY + 14;
+                if (stompedFromAbove) {
+                    enemy.hit = true;
+                    y = enemyY - PLAYER_HEIGHT;
+                    vy = -390;
+                    onGround = false;
+                    body.y = (int) y;
+                } else {
+                    loseLife();
+                    return;
+                }
             }
         }
         AnimationState animation = !onGround ? (vy < 0 ? AnimationState.JUMP : AnimationState.FALL)
@@ -413,7 +482,8 @@ public final class Game extends JPanel {
         if (currentPhase == 0) {
             for (Thing trap : traps) {
                 if (!trap.hit && Math.abs(centerX - trap.x) < 76 && Math.abs(centerY - trap.y) < 90) {
-                    trap.hit = true; showToast("Armadilha desativada. A trilha esta protegida."); return;
+                    startTrapChallenge(trap);
+                    return;
                 }
             }
             showToast("Procure os sinais de armadilha na trilha."); return;
@@ -435,6 +505,70 @@ public final class Game extends JPanel {
         showToast("Procure uma fonte ou aproxime-se de um foco de incendio.");
     }
 
+    private void startTrapChallenge(Thing trap) {
+        activeTrap = trap;
+        trapChallengeStage = 1;
+        trapBallPosition = 0.02;
+        trapBallDirection = 1;
+        trapChallengeMessage = "Acerte a bolinha dourada na faixa verde.";
+        trapChallengeMessageUntil = System.currentTimeMillis() + 2000;
+        setTrapChallengeDifficulty();
+        held.clear();
+        screen = GameState.TRAP_CHALLENGE;
+    }
+
+    private void setTrapChallengeDifficulty() {
+        trapChallengeSpeed = switch (trapChallengeStage) {
+            case 1 -> 0.72;
+            case 2 -> 1.02;
+            default -> 1.38;
+        };
+        trapTargetHalfWidth = switch (trapChallengeStage) {
+            case 1 -> 0.15;
+            case 2 -> 0.105;
+            default -> 0.07;
+        };
+        trapTargetCenter = switch (trapChallengeStage) {
+            case 1 -> 0.38;
+            case 2 -> 0.68;
+            default -> 0.45;
+        };
+    }
+
+    private void updateTrapChallenge(double dt) {
+        trapBallPosition += trapBallDirection * trapChallengeSpeed * Math.min(dt, 0.05);
+        if (trapBallPosition >= 1) { trapBallPosition = 1; trapBallDirection = -1; }
+        else if (trapBallPosition <= 0) { trapBallPosition = 0; trapBallDirection = 1; }
+        if (trapChallengeMessageUntil < System.currentTimeMillis()) trapChallengeMessage = "";
+    }
+
+    private void confirmTrapChallengeHit() {
+        if (screen != GameState.TRAP_CHALLENGE || activeTrap == null) return;
+        if (Math.abs(trapBallPosition - trapTargetCenter) > trapTargetHalfWidth + 0.018) {
+            trapChallengeMessage = "Quase! Tente novamente quando a bolinha passar pelo verde.";
+            trapChallengeMessageUntil = System.currentTimeMillis() + 1000;
+            return;
+        }
+        if (trapChallengeStage == 3) {
+            activeTrap.hit = true;
+            activeTrap = null;
+            screen = GameState.WORLD;
+            showToast("Armadilha desativada. A trilha esta protegida.");
+            return;
+        }
+        trapChallengeStage++;
+        setTrapChallengeDifficulty();
+        trapChallengeMessage = "Acertou! A bolinha acelerou e a faixa verde diminuiu.";
+        trapChallengeMessageUntil = System.currentTimeMillis() + 1300;
+    }
+
+    private void cancelTrapChallenge() {
+        activeTrap = null;
+        trapChallengeStage = 0;
+        trapChallengeMessage = "";
+        screen = GameState.WORLD;
+    }
+
     private void loseLife() {
         lives--; x = 110; y = 500; vy = 0;
         if (lives <= 0) { lives = 3; coinsCollected = 0; buildLevel(); showToast("A floresta lhe deu outra chance."); }
@@ -453,6 +587,11 @@ public final class Game extends JPanel {
             else if (key == KeyEvent.VK_ENTER && cinematicManager.state() == CinematicManager.PlaybackState.FAILED) cinematicManager.retry();
         }
         else if (screen == GameState.PHASE_INTRO) { if (key == KeyEvent.VK_ENTER || key == KeyEvent.VK_SPACE) screen = GameState.WORLD; else if (key == KeyEvent.VK_ESCAPE) returnToMenu(); }
+        else if (screen == GameState.TRAP_CHALLENGE) {
+            if (key == KeyEvent.VK_ESCAPE) cancelTrapChallenge();
+            else if (key == KeyEvent.VK_ENTER || key == KeyEvent.VK_SPACE || key == KeyEvent.VK_E)
+                confirmTrapChallengeHit();
+        }
         else if (screen == GameState.WORLD) worldKey(key);
         else if (screen == GameState.PAUSE) pauseKey(key);
         else if (screen == GameState.SETTINGS) settingsKey(key);
@@ -645,9 +784,10 @@ public final class Game extends JPanel {
         }
         else if (screen == GameState.SAVE_OPTIONS) { saveOptionIndex = inside(x,y,300,275,680,72) ? 0 : inside(x,y,300,367,680,72) ? 1 : saveOptionIndex; if (inside(x,y,300,275,680,72)||inside(x,y,300,367,680,72)) cursor=java.awt.Cursor.HAND_CURSOR; }
         else if (screen == GameState.PHASE_SELECT) { for(int i=0;i<Phase.values().length;i++) if(inside(x,y,215,205+i*88,850,70)){phaseSelectIndex=i;cursor=java.awt.Cursor.HAND_CURSOR;break;} }
-        else if (screen == GameState.SAVE_CONFIRM) { if(inside(x,y,370,395,230,64)){settingsIndex=0;cursor=java.awt.Cursor.HAND_CURSOR;}else if(inside(x,y,680,395,230,64)){settingsIndex=1;cursor=java.awt.Cursor.HAND_CURSOR;} }
+        else if (screen == GameState.SAVE_CONFIRM) { if(inside(x,y,310,395,300,70)){settingsIndex=0;cursor=java.awt.Cursor.HAND_CURSOR;}else if(inside(x,y,670,395,300,70)){settingsIndex=1;cursor=java.awt.Cursor.HAND_CURSOR;} }
         else if (screen == GameState.SETTINGS) { if (settingsRowAt(x, y) >= 0 || inside(x,y,440,575,400,45)) { int row=settingsRowAt(x,y); if(row>=0)settingsIndex=row; cursor=java.awt.Cursor.HAND_CURSOR; } }
         else if (screen == GameState.PAUSE) { int option = pauseOptionAt(x, y); if (option >= 0) { menuIndex = option; cursor=java.awt.Cursor.HAND_CURSOR; } }
+        else if (screen == GameState.TRAP_CHALLENGE && inside(x, y, 250, 330, 780, 100)) cursor=java.awt.Cursor.HAND_CURSOR;
         else if (screen == GameState.BATTLE) { int option = battleChoiceAt(x, y); if (option >= 0) { battleChoice = option; cursor=java.awt.Cursor.HAND_CURSOR; } }
         else if (screen == GameState.DIALOGUE || screen == GameState.PHASE_INTRO || screen == GameState.END || screen == GameState.EXTRAS || screen == GameState.CONTROLS) cursor=java.awt.Cursor.HAND_CURSOR;
         else if (screen == GameState.MAP) cursor=java.awt.Cursor.HAND_CURSOR;
@@ -674,10 +814,21 @@ public final class Game extends JPanel {
                     slotsKey(KeyEvent.VK_ENTER);
                 }
             }
-            case WORLD -> { double worldX=x+camera; boolean target=y>=510&&y<=610&&(currentPhase==0&&traps.stream().anyMatch(t->!t.hit&&Math.abs(worldX-t.x)<42)||currentPhase==2&&(Math.abs(worldX-145)<38||Math.abs(worldX-1650)<38||fires.stream().anyMatch(f->!f.hit&&Math.abs(worldX-f.x)<42)));if(target&&Math.abs(worldX-this.x)<110)interactPhase();else if(target)showToast("Aproxime-se do elemento para interagir com E ou clique."); }
+            case WORLD -> {
+                double worldX = x + camera;
+                boolean targetY = y >= GROUND_Y - 110 && y <= GROUND_Y + 10;
+                boolean trapTarget = currentPhase == 0
+                    && traps.stream().anyMatch(t -> !t.hit && Math.abs(worldX - t.x) < 42);
+                boolean fireTarget = currentPhase == 2
+                    && (Math.abs(worldX - 145) < 38 || Math.abs(worldX - 1650) < 38
+                        || fires.stream().anyMatch(f -> !f.hit && Math.abs(worldX - f.x) < 42));
+                if (targetY && (trapTarget || fireTarget) && Math.abs(worldX - this.x) < 110) interactPhase();
+                else if (targetY && (trapTarget || fireTarget)) showToast("Aproxime-se do elemento para interagir com E ou clique.");
+            }
+            case TRAP_CHALLENGE -> { if (inside(x, y, 250, 330, 780, 100)) confirmTrapChallengeHit(); }
             case SAVE_OPTIONS -> { if(inside(x,y,300,275,680,72)){saveOptionIndex=0;saveOptionsKey(KeyEvent.VK_ENTER);}else if(inside(x,y,300,367,680,72)){saveOptionIndex=1;saveOptionsKey(KeyEvent.VK_ENTER);}else if(inside(x,y,300,480,680,55))screen=GameState.SLOTS; }
             case PHASE_SELECT -> { for(int i=0;i<Phase.values().length;i++)if(inside(x,y,215,205+i*88,850,70)){phaseSelectIndex=i;selectSavedPhase(i);return;} if(inside(x,y,420,570,440,55))screen=GameState.SAVE_OPTIONS; }
-            case SAVE_CONFIRM -> { if(inside(x,y,370,395,230,64)){settingsIndex=0;saveConfirmKey(KeyEvent.VK_ENTER);}else if(inside(x,y,680,395,230,64)){settingsIndex=1;saveConfirmKey(KeyEvent.VK_ENTER);} }
+            case SAVE_CONFIRM -> { if(inside(x,y,310,395,300,70)){settingsIndex=0;saveConfirmKey(KeyEvent.VK_ENTER);}else if(inside(x,y,670,395,300,70)){settingsIndex=1;saveConfirmKey(KeyEvent.VK_ENTER);} }
             case SETTINGS -> {
                 int row = settingsRowAt(x, y);
                 if (row >= 0) {
@@ -695,7 +846,7 @@ public final class Game extends JPanel {
             case BATTLE -> { int option = battleChoiceAt(x, y); if (option >= 0) { battleChoice = option; battleKey(KeyEvent.VK_ENTER); } }
             case CINEMATIC -> { /* Videos can only finish naturally; recovery belongs to JavaFX. */ }
             case PHASE_INTRO -> { if(inside(x,y,480,575,600,90))screen=GameState.WORLD; }
-            case END -> { if(inside(x,y,430,475,600,100))returnToMenu(); }
+            case END -> { if(inside(x,y,480,535,320,64))returnToMenu(); }
             case NAME -> { if(inside(x,y,320,390,650,100)){nameConfirm=true;openCharacterSelection();} }
             case CHARACTER_SELECT -> {
                 int card = characterCardAt(x, y);
@@ -901,6 +1052,7 @@ public final class Game extends JPanel {
             }
             case EXTRAS -> { drawMenu(g); drawPopupDim(g); drawExtras(g); }
             case WORLD -> drawWorld(g);
+            case TRAP_CHALLENGE -> { drawWorld(g); drawTrapChallenge(g); }
             case PAUSE -> { drawWorld(g); drawPause(g); }
             case MAP -> { drawWorld(g); drawMap(g); }
             case DIALOGUE -> { drawWorld(g); drawDialogue(g); }
@@ -1087,10 +1239,12 @@ public final class Game extends JPanel {
             drawCenteredText(g, character.label(), centerX, 450, 25,
                 character.selectable() ? Color.WHITE : new Color(170, 178, 175));
         }
-        g.setColor(characterChoice.selectable() ? new Color(184, 91, 57) : new Color(60, 64, 62));
+        g.setColor(characterChoice.selectable() ? new Color(255, 216, 92) : new Color(60, 64, 62));
         g.fillRoundRect(470, 550, 340, 56, 12, 12);
+        g.setColor(characterChoice.selectable() ? new Color(255, 236, 154) : new Color(110, 115, 110));
+        g.drawRoundRect(470, 550, 340, 56, 12, 12);
         drawCenteredText(g, characterChoice.selectable() ? "Confirmar personagem" : "Personagem bloqueada",
-            W / 2, 586, 20, characterChoice.selectable() ? Color.WHITE : new Color(165, 170, 165));
+            W / 2, 586, 20, characterChoice.selectable() ? new Color(25, 48, 51) : new Color(165, 170, 165));
         drawText(g, "< Voltar", 220, 596, 18, Color.WHITE);
         drawCenteredText(g, "A/D ou setas escolhem  •  Enter confirma  •  Esc volta", W / 2, 630, 16, Color.WHITE);
     }
@@ -1212,21 +1366,26 @@ public final class Game extends JPanel {
         String[] values = { textScale == 0 ? "Compacto" : textScale == 1 ? "Padrão" : "Ampliado", contrast ? "Ligado" : "Desligado", "Abrir" };
         for (int i = 0; i < labels.length; i++) {
             int rowY = 225 + i * 90;
-            g.setColor(i == settingsIndex ? new Color(76, 55, 35, 218) : new Color(8, 30, 27, 205));
-            g.fillRoundRect(260, rowY, 760, 62, 10, 10);
-            g.setColor(i == settingsIndex ? new Color(255, 216, 92, 185) : new Color(210, 181, 112, 90));
-            g.drawRoundRect(260, rowY, 760, 62, 10, 10);
-            drawText(g, labels[i], 295, rowY + 39, 19, Color.WHITE);
-            drawSettingArrow(g, 785, rowY + 17, 28, 30, true);
-            drawCenteredText(g, values[i], 870, rowY + 39, 18, new Color(255, 239, 194));
-            drawSettingArrow(g, 945, rowY + 17, 28, 30, false);
+            boolean selected = i == settingsIndex;
+            drawGoldSelectableOption(g, 260, rowY, 760, 62, selected);
+            Color rowText = selected ? new Color(25, 48, 51) : Color.WHITE;
+            drawText(g, labels[i], 295, rowY + 39, 19, rowText);
+            drawSettingArrow(g, 785, rowY + 17, 28, 30, true, selected);
+            drawCenteredText(g, values[i], 870, rowY + 39, 18, selected ? new Color(60, 48, 22) : new Color(255, 239, 194));
+            drawSettingArrow(g, 945, rowY + 17, 28, 30, false, selected);
         }
         drawCenteredText(g, "Esc fecha", W / 2, 605, 16, new Color(231, 224, 194));
     }
 
-    private void drawSettingArrow(Graphics2D g, int x, int y, int width, int height, boolean left) {
+    private void drawSettingArrow(Graphics2D g, int x, int y, int width, int height, boolean left, boolean selected) {
         if (pauseIndicatorImage == null) {
-            drawText(g, left ? "<" : ">", x, y + height - 3, 24, new Color(255, 216, 92));
+            g.setColor(new Color(255, 216, 92));
+            int direction = left ? -1 : 1;
+            int centerX = x + width / 2, centerY = y + height / 2;
+            g.setStroke(new java.awt.BasicStroke(3, java.awt.BasicStroke.CAP_ROUND, java.awt.BasicStroke.JOIN_ROUND));
+            g.drawLine(centerX - direction * 5, centerY - 7, centerX + direction * 3, centerY);
+            g.drawLine(centerX + direction * 3, centerY, centerX - direction * 5, centerY + 7);
+            g.setStroke(new java.awt.BasicStroke(1));
         } else if (left) {
             g.drawImage(pauseIndicatorImage, x + width, y, x, y + height,
                 0, 0, pauseIndicatorImage.getWidth(), pauseIndicatorImage.getHeight(), this);
@@ -1235,7 +1394,16 @@ public final class Game extends JPanel {
         }
     }
     private void drawControls(Graphics2D g) { g.setColor(new Color(0, 0, 0, 178)); g.fillRoundRect(250, 130, 780, 470, 18, 18); g.setColor(new Color(214,177,91,190)); g.drawRoundRect(250,130,780,470,18,18); drawText(g,"CONTROLES",520,205,29,new Color(255,216,92)); drawText(g,"A/D ou SETAS: correr",390,300,21,Color.WHITE); drawText(g,"W, SETA CIMA ou ESPACO: pular",390,355,21,Color.WHITE); drawText(g,"M: mapa   F5: salvar   Esc: pausar",390,410,20,Color.WHITE); drawCenteredText(g,"Clique ou pressione Esc para voltar",W/2,535,16,new Color(245,230,190)); }
-    private void drawExtras(Graphics2D g) { g.setColor(new Color(18, 43, 38, 238)); g.fillRoundRect(270, 190, 740, 350, 16, 16); g.setColor(new Color(213,179,105));g.drawRoundRect(270,190,740,350,16,16);drawText(g, "AJUDA E INFORMACOES", 420, 250, 30, new Color(255,216,92));drawParagraph(g, "Uma aventura inspirada nas lendas da floresta brasileira. Proteja a mata, respeite os animais e siga as orientacoes de cada guardiao.", 350, 320, 580, 30, Color.WHITE, 20);drawText(g, "Clique fora ou pressione Esc para voltar", 410, 480, 16, new Color(245,230,190)); }
+    private void drawExtras(Graphics2D g) {
+        drawStandardPanel(g, 250, 165, 780, 390);
+        drawCenteredText(g, "AJUDA E INFORMAÇÕES", W / 2, 238, 30, new Color(255, 216, 92));
+        g.setColor(new Color(214, 177, 91, 120));
+        g.drawLine(330, 265, 950, 265);
+        drawParagraph(g,
+            "Uma aventura inspirada nas lendas da floresta brasileira. Proteja a mata, respeite os animais e siga as orientações de cada guardião.",
+            330, 325, 620, 32, Color.WHITE, 20);
+        drawCenteredText(g, "Clique fora ou pressione Esc para voltar", W / 2, 510, 16, new Color(245, 230, 190));
+    }
 
     private void drawSaveOptions(Graphics2D g) {
         drawStandardPanel(g, 250, 165, 780, 390);
@@ -1243,28 +1411,49 @@ public final class Game extends JPanel {
         String[] labels = { "Continuar de onde parou", "Escolher fase desbloqueada" };
         for (int i = 0; i < labels.length; i++) {
             int rowY = 275 + i * 92;
-            drawStandardOption(g, 300, rowY, 680, 72, i == saveOptionIndex);
-            drawText(g, labels[i], 345, rowY + 45, 21, Color.WHITE);
+            drawGoldSelectableOption(g, 300, rowY, 680, 72, i == saveOptionIndex);
+            drawText(g, labels[i], 345, rowY + 45, 21,
+                i == saveOptionIndex ? new Color(25, 48, 51) : Color.WHITE);
         }
         drawCenteredText(g, "Esc volta aos saves", W / 2, 510, 16, new Color(205, 225, 195));
     }
-    private void drawPhaseSelect(Graphics2D g) { g.setColor(new Color(18,43,38,220));g.fillRoundRect(190,105,900,520,16,16);drawText(g,"SELECIONAR FASE",480,155,29,new Color(255,216,92));for(int i=0;i<Phase.values().length;i++){int y=205+i*88;boolean available=i<=unlockedPhase;g.setColor(i==phaseSelectIndex?new Color(184,91,57):new Color(31,69,56));if(!available)g.setColor(new Color(55,65,58));g.fillRoundRect(215,y,850,70,10,10);drawText(g,Phase.values()[i].title,250,y+31,17,available?Color.WHITE:new Color(175,175,160));drawText(g,available?"DESBLOQUEADA":"BLOQUEADA",805,y+53,13,new Color(255,222,153));}drawText(g,"Voltar",590,604,17,Color.WHITE);}
+    private void drawPhaseSelect(Graphics2D g) {
+        drawStandardPanel(g, 190, 105, 900, 520);
+        drawCenteredText(g, "SELECIONAR FASE", W / 2, 155, 29, new Color(255, 216, 92));
+        for (int i = 0; i < Phase.values().length; i++) {
+            int rowY = 205 + i * 88;
+            boolean available = i <= unlockedPhase;
+            boolean selected = i == phaseSelectIndex && available;
+            if (available) drawGoldSelectableOption(g, 215, rowY, 850, 70, selected);
+            else {
+                g.setColor(new Color(55, 65, 58, 190));
+                g.fillRoundRect(215, rowY, 850, 70, 10, 10);
+            }
+            Color textColor = selected ? new Color(25, 48, 51)
+                : available ? Color.WHITE : new Color(175, 175, 160);
+            drawText(g, Phase.values()[i].title, 250, rowY + 31, 17, textColor);
+            drawText(g, available ? "DESBLOQUEADA" : "BLOQUEADA", 805, rowY + 53, 13,
+                selected ? new Color(60, 48, 22) : new Color(255, 222, 153));
+        }
+        drawCenteredText(g, "Voltar", W / 2, 604, 17, Color.WHITE);
+    }
     private void drawSaveConfirmation(Graphics2D g) {
-        drawStandardPanel(g, 275, 190, 730, 340);
+        drawStandardPanel(g, 275, 180, 730, 360);
         String title = confirmAction == ConfirmAction.DELETE_SAVE ? "APAGAR ESTE SAVE?"
             : confirmAction == ConfirmAction.RESTART_PHASE ? "REINICIAR NESTA FASE?" : "COMEÇAR NOVA CAMPANHA?";
-        drawCenteredText(g, title, W / 2, 260, 28, new Color(255, 216, 92));
+        drawCenteredText(g, title, W / 2, 245, 28, new Color(255, 216, 92));
         String message = confirmAction == ConfirmAction.DELETE_SAVE ? "O progresso deste slot será removido."
             : confirmAction == ConfirmAction.RESTART_PHASE ? "O progresso atual será substituído pelo início da fase escolhida."
             : "O progresso salvo neste slot será substituído.";
-        drawParagraph(g, message, 365, 315, 550, 28, Color.WHITE, 19);
+        drawParagraph(g, message, 365, 310, 550, 28, Color.WHITE, 19);
         String[] labels = confirmAction == ConfirmAction.DELETE_SAVE ? new String[] { "Apagar", "Cancelar" }
             : confirmAction == ConfirmAction.RESTART_PHASE ? new String[] { "Reiniciar", "Cancelar" }
             : new String[] { "Continuar", "Cancelar" };
         for (int i = 0; i < labels.length; i++) {
-            int x = 370 + i * 310;
-            drawStandardOption(g, x, 395, 230, 64, settingsIndex == i);
-            drawCenteredText(g, labels[i], x + 115, 435, 18, Color.WHITE);
+            int x = 310 + i * 360;
+            drawStandardOption(g, x, 395, 300, 70, settingsIndex == i);
+            drawCenteredText(g, labels[i], x + 150, 438, 19,
+                settingsIndex == i ? new Color(25, 48, 51) : Color.WHITE);
         }
     }
 
@@ -1278,10 +1467,16 @@ public final class Game extends JPanel {
     }
 
     private void drawStandardOption(Graphics2D g, int x, int y, int width, int height, boolean selected) {
-        g.setColor(selected ? new Color(184, 91, 57, 235) : new Color(13, 45, 39, 225));
+        drawGoldSelectableOption(g, x, y, width, height, selected);
+    }
+
+    private void drawGoldSelectableOption(Graphics2D g, int x, int y, int width, int height, boolean selected) {
+        g.setColor(selected ? new Color(255, 216, 92) : new Color(0, 0, 0, 28));
         g.fillRoundRect(x, y, width, height, 12, 12);
-        g.setColor(selected ? new Color(255, 216, 92, 210) : new Color(214, 177, 91, 105));
+        g.setColor(selected ? new Color(255, 236, 154) : new Color(214, 177, 91, 105));
+        g.setStroke(new java.awt.BasicStroke(selected ? 2 : 1));
         g.drawRoundRect(x, y, width, height, 12, 12);
+        g.setStroke(new java.awt.BasicStroke(1));
     }
 
     private void drawWorld(Graphics2D g) {
@@ -1300,11 +1495,14 @@ public final class Game extends JPanel {
         for (int i = 0; i < options.length; i++) {
             int rowY = 275 + i * 58;
             if (i == menuIndex) {
-                g.setColor(new Color(255, 255, 255, 24));
+                g.setColor(new Color(255, 216, 92));
                 g.fillRoundRect(405, rowY, 470, 50, 10, 10);
-                if (pauseIndicatorImage != null) drawImageFit(g, pauseIndicatorImage, 423, rowY + 5, 42, 40);
+                g.setColor(new Color(255, 236, 154));
+                g.drawRoundRect(405, rowY, 470, 50, 10, 10);
+                if (pauseIndicatorImage != null) drawImageFit(g, pauseIndicatorImage, 429, rowY + 11, 22, 28);
             }
-            drawText(g, options[i], 485, rowY + 33, 21, Color.WHITE);
+            drawText(g, options[i], 485, rowY + 33, 21,
+                i == menuIndex ? new Color(25, 48, 51) : Color.WHITE);
         }
     }
 
@@ -1316,6 +1514,51 @@ public final class Game extends JPanel {
         }
         return -1;
     }
+
+    private void drawTrapChallenge(Graphics2D g) {
+        g.setColor(new Color(0, 0, 0, 125));
+        g.fillRect(0, 0, W, H);
+        drawStandardPanel(g, 180, 185, 920, 385);
+        drawCenteredText(g, "DESATIVE A ARMADILHA", W / 2, 242, 30, new Color(255, 216, 92));
+        drawCenteredText(g, "Acerte a bolinha dourada quando ela passar pelo campo verde",
+            W / 2, 284, 18, Color.WHITE);
+        drawCenteredText(g, "ETAPA " + trapChallengeStage + " DE 3", W / 2, 326, 17,
+            new Color(255, 226, 125));
+
+        int trackX = 280, trackY = 355, trackWidth = 720, trackHeight = 34;
+        g.setColor(new Color(7, 19, 18, 235));
+        g.fillRoundRect(trackX, trackY, trackWidth, trackHeight, 17, 17);
+        int targetX = trackX + (int) Math.round((trapTargetCenter - trapTargetHalfWidth) * trackWidth);
+        int targetWidth = (int) Math.round(trapTargetHalfWidth * 2 * trackWidth);
+        g.setColor(new Color(62, 166, 92));
+        g.fillRoundRect(targetX, trackY + 3, targetWidth, trackHeight - 6, 13, 13);
+        g.setColor(new Color(145, 230, 155, 180));
+        g.drawRoundRect(targetX, trackY + 3, targetWidth, trackHeight - 6, 13, 13);
+
+        int ballX = trackX + (int) Math.round(trapBallPosition * trackWidth);
+        int ballY = trackY + trackHeight / 2;
+        g.setColor(new Color(255, 205, 55, 90));
+        g.fillOval(ballX - 17, ballY - 17, 34, 34);
+        g.setColor(new Color(255, 216, 92));
+        g.fillOval(ballX - 11, ballY - 11, 22, 22);
+        g.setColor(new Color(255, 246, 183));
+        g.fillOval(ballX - 6, ballY - 7, 7, 7);
+
+        for (int stage = 1; stage <= 3; stage++) {
+            int centerX = W / 2 + (stage - 2) * 66;
+            g.setColor(stage <= trapChallengeStage ? new Color(255, 216, 92) : new Color(82, 96, 83));
+            g.fillOval(centerX - 10, 418, 20, 20);
+            if (stage < 3) {
+                g.setColor(stage < trapChallengeStage ? new Color(255, 216, 92) : new Color(82, 96, 83));
+                g.fillRoundRect(centerX + 11, 426, 44, 4, 4, 4);
+            }
+        }
+        if (!trapChallengeMessage.isEmpty())
+            drawCenteredText(g, trapChallengeMessage, W / 2, 482, 16, new Color(205, 230, 192));
+        drawCenteredText(g, "Enter, E, Espaço ou clique na faixa confirma   •   Esc cancela",
+            W / 2, 535, 15, new Color(238, 229, 199));
+    }
+
     private void drawMap(Graphics2D g) {
         g.setColor(new Color(0, 0, 0, 62)); g.fillRect(0, 0, W, H);
         drawStandardPanel(g, 70, 95, 1140, 530);
@@ -1358,12 +1601,12 @@ public final class Game extends JPanel {
         for (int i = 0; i < question.options().length; i++) {
             int rowY = 310 + i * 66;
             if (i == battleChoice) {
-                g.setColor(new Color(255, 255, 255, 28)); g.fillRoundRect(135, rowY, 1010, 54, 10, 10);
-                g.setColor(new Color(255, 216, 92, 190)); g.drawRoundRect(135, rowY, 1010, 54, 10, 10);
-                if (pauseIndicatorImage != null) drawImageFit(g, pauseIndicatorImage, 151, rowY + 7, 40, 40);
+                g.setColor(new Color(255, 216, 92)); g.fillRoundRect(135, rowY, 1010, 54, 10, 10);
+                g.setColor(new Color(255, 236, 154)); g.drawRoundRect(135, rowY, 1010, 54, 10, 10);
+                if (pauseIndicatorImage != null) drawImageFit(g, pauseIndicatorImage, 155, rowY + 12, 22, 30);
             }
             drawText(g, (i + 1) + "  |  " + question.options()[i], 210, rowY + 35, 18,
-                i == battleChoice ? new Color(255, 226, 125) : Color.WHITE);
+                i == battleChoice ? new Color(25, 48, 51) : Color.WHITE);
         }
         drawText(g, "Setas ou 1-4 selecionam   •   Enter confirma", 390, 630, 16, new Color(205, 225, 195));
     }
@@ -1376,7 +1619,34 @@ public final class Game extends JPanel {
         }
         return -1;
     }
-    private void drawEnd(Graphics2D g) { drawBackdrop(g); BufferedImage portrait = guardianImages[Phase.NEGRINHO.ordinal()]; if (portrait != null) drawImageFit(g, portrait, 170, 220, 270, 330); drawText(g, "CAMPANHA CONCLUIDA", 500, 230, 38, new Color(255, 216, 92)); drawParagraph(g, "Voce acompanhou Curupira, Saci, Caipora e Negrinho do Pastoreio e ajudou a proteger a floresta.", 500, 300, 570, 30, Color.WHITE, 22); drawText(g, "Enter volta ao menu", 500, 520, 18, new Color(245, 230, 190)); }
+    private void drawEnd(Graphics2D g) {
+        drawImageCover(g, menuBackground, 0, 0, W, H);
+        g.setColor(new Color(0, 0, 0, 112));
+        g.fillRect(0, 0, W, H);
+        drawStandardPanel(g, 130, 105, 1020, 510);
+
+        BufferedImage portrait = guardianImages[Phase.NEGRINHO.ordinal()];
+        if (portrait != null) drawImageFit(g, portrait, 175, 195, 300, 350);
+        g.setColor(new Color(214, 177, 91, 135));
+        g.drawLine(490, 175, 1090, 175);
+
+        drawCenteredText(g, "CAMPANHA CONCLUÍDA", 790, 225, 34, new Color(255, 216, 92));
+        drawParagraph(g,
+            "Você acompanhou Curupira, Saci, Caipora e Negrinho do Pastoreio e ajudou a proteger a floresta.",
+            525, 290, 555, 31, Color.WHITE, 20);
+        drawParagraph(g,
+            "A floresta floresce quando cada vida é respeitada. Cuidar da natureza hoje mantém vivas as histórias de amanhã.",
+            525, 390, 555, 31, new Color(227, 238, 219), 20);
+        drawCenteredText(g, "Obrigado por caminhar ao lado da natureza.", 790, 495, 17, new Color(255, 226, 125));
+
+        g.setColor(new Color(255, 216, 92));
+        g.fillRoundRect(480, 535, 320, 64, 12, 12);
+        g.setColor(new Color(255, 216, 92, 235));
+        g.setStroke(new java.awt.BasicStroke(2));
+        g.drawRoundRect(480, 535, 320, 64, 12, 12);
+        g.setStroke(new java.awt.BasicStroke(1));
+        drawCenteredText(g, "Voltar ao menu", 640, 575, 18, new Color(25, 48, 51));
+    }
 
     private int firstSave() { return hasSave(0) ? 0 : hasSave(1) ? 1 : -1; }
     private boolean hasSave(int slot) { return saveManager.hasSave(slot); }

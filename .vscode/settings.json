@@ -3,7 +3,7 @@
   "java.configuration.runtimes": [
     {
       "name": "JavaSE-27",
-      "path": "C:\\Program Files\\Java\\jdk-27",
+      "path": "C:\\Program Files\\Java\\jdk-27.0.1.0.3",
       "default": true
     }
   ],
@@ -15,5 +15,6 @@
     "lib/javafx-sdk-27/lib/*.jar",
     "lib/*.jar"
   ],
+  "java.debug.settings.javaExec": "C:\\Program Files\\Java\\jdk-27.0.1.0.3\\bin\\java.exe",
   "java.errors.incompleteClasspath.severity": "warning"
 }
