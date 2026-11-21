@@ -3,18 +3,18 @@
   "java.configuration.runtimes": [
     {
       "name": "JavaSE-27",
-      "path": "C:\\Program Files\\Java\\jdk-27.0.1.0.3",
+      "path": "C:\\Program Files\\Java\\jdk-27",
       "default": true
     }
   ],
   "java.project.sourcePaths": [
     "src/main/java"
   ],
-  "java.project.outputPath": "out",
+  "java.project.outputPath": "out/vscode",
   "java.project.referencedLibraries": [
-    "lib/javafx-sdk-27/lib/*.jar",
+    "lib/javafx/*.jar",
     "lib/*.jar"
   ],
-  "java.debug.settings.javaExec": "C:\\Program Files\\Java\\jdk-27.0.1.0.3\\bin\\java.exe",
+  "java.debug.settings.javaExec": "C:\\Program Files\\Java\\jdk-27\\bin\\java.exe",
   "java.errors.incompleteClasspath.severity": "warning"
 }

@@ -2,49 +2,50 @@ package br.com.raizes.quiz;
 
 import br.com.raizes.model.Question;
 
+/** Comparable distractors; option order is shuffled for every quiz round. */
 public final class QuestionBank {
     private QuestionBank() { }
-
     public static final Question[][] QUESTIONS = {
         {
-            new Question("O que fazer ao encontrar uma armadilha na mata?", new String[] { "Desarmar sem cuidado", "Afastar-se e avisar as autoridades", "Levar para casa", "Esconder a armadilha" }, 1),
-            new Question("Por que a caça ilegal prejudica a floresta?", new String[] { "Reduz as populacoes e desequilibra os ecossistemas", "Ajuda os animais a migrar", "Aumenta a variedade de especies", "Nao causa impacto" }, 0),
-            new Question("Encontrou um animal silvestre ferido. Qual a atitude adequada?", new String[] { "Tentar domestica-lo", "Oferecer qualquer alimento", "Manter distancia e procurar ajuda especializada", "Solta-lo em outro bairro" }, 2),
-            new Question("Animais silvestres devem viver principalmente...", new String[] { "Em casas", "Em seu habitat natural", "Em lojas", "Em qualquer cidade" }, 1),
-            new Question("Ao suspeitar de comercio de animais silvestres, voce deve...", new String[] { "Comprar para salvar o animal", "Confrontar o suspeito sozinho", "Divulgar o endereco do suspeito", "Registrar a denuncia aos orgaos competentes" }, 3),
-            new Question("Qual atitude ajuda a proteger a fauna?", new String[] { "Preservar habitats e respeitar os animais", "Alimentar animais com doces", "Retirar filhotes da mata", "Manter animais silvestres como pets" }, 0),
-            new Question("Por que nao devemos tocar em uma armadilha encontrada?", new String[] { "Ela pode ser perigosa e apagar evidencias", "Ela pode ficar mais colorida", "Animais nao percebem", "Apenas por causa do barulho" }, 0),
-            new Question("O que a biodiversidade representa?", new String[] { "A quantidade de trilhas", "A variedade de seres vivos e suas relacoes", "Somente o numero de arvores", "Apenas os animais grandes" }, 1)
+            q("Qual situação caracteriza a caça ilegal?", 0, "Captura proibida de animais silvestres", "Pesquisa autorizada sobre aves da região", "Observação de ninhos a distância segura", "Registro de espécies em área protegida"),
+            q("Sem um predador nativo, o que pode ocorrer?", 2, "Fim de toda a competição por alimento", "Desaparecimento de qualquer ser vivo", "Crescimento de certas populações de presas", "Aumento automático de todas as plantas"),
+            q("Um animal dispersor de sementes ajuda na...", 1, "Formação de rochas", "Regeneração da floresta", "Produção de nuvens", "Limpeza das estradas"),
+            q("Qual ação contribui para conservar um habitat?", 3, "Trocar a mata por um gramado", "Abrir novos atalhos na mata", "Iluminar os ninhos à noite", "Manter a vegetação nativa"),
+            q("Biodiversidade é a variedade de...", 2, "Estradas de uma região", "Construções nas cidades", "Seres vivos e suas relações", "Reservatórios de concreto"),
+            q("Não alimentar a fauna silvestre ajuda a evitar...", 0, "Mudanças no comportamento dos animais", "A formação natural de folhas nas árvores", "A circulação do vento entre as plantas", "A produção de sementes pelas espécies"),
+            q("Ao encontrar uma armadilha na trilha, qual atitude é segura?", 3, "Tentar abrir a peça com as próprias mãos", "Transportar a armadilha até outra trilha", "Esconder a peça para ninguém encontrá-la", "Manter distância e avisar a equipe local"),
+            q("A perda de uma espécie pode alterar...", 1, "A posição geográfica da floresta", "As relações da cadeia alimentar", "A duração exata de todas as estações", "O sentido da rotação do planeta")
         },
         {
-            new Question("Qual atitude reduz o impacto de um passeio na natureza?", new String[] { "Sair das trilhas demarcadas", "Levar o lixo de volta e respeitar a sinalizacao", "Retirar plantas como lembranca", "Alimentar os animais" }, 1),
-            new Question("Como economizar agua em casa?", new String[] { "Deixar a torneira aberta", "Lavar a calcada diariamente", "Fechar a torneira enquanto escova os dentes", "Tomar banhos mais longos" }, 2),
-            new Question("Ao ver lixo na trilha, o que fazer?", new String[] { "Levar e descartar corretamente, se for seguro", "Empurrar para o mato", "Queimar no local", "Jogar no rio" }, 0),
-            new Question("Qual escolha ajuda a reduzir residuos?", new String[] { "Usar descartaveis sempre", "Comprar apenas pelo excesso", "Reutilizar objetos quando possivel", "Deixar embalagens na rua" }, 2),
-            new Question("Como devemos observar animais silvestres?", new String[] { "De perto e fazendo barulho", "A distancia, sem alimentar nem perseguir", "Carregando-os no colo", "Usando flash bem proximo" }, 1),
-            new Question("Qual e uma forma responsavel de descartar reciclaveis?", new String[] { "Separar conforme a coleta local", "Enterrar no parque", "Jogar no bueiro", "Misturar no rio" }, 0),
-            new Question("Por que apagar as luzes que nao estao sendo usadas?", new String[] { "Para aumentar o desperdicio", "Para economizar energia", "Para aquecer a floresta", "Nao faz diferenca" }, 1),
-            new Question("Como incentivar o cuidado ambiental na comunidade?", new String[] { "Compartilhar informacao confiavel e dar exemplo", "Espalhar boatos", "Ignorar problemas locais", "Destruir placas educativas" }, 0)
+            q("Numa trilha sinalizada, qual escolha causa menos impacto?", 1, "Abrir atalhos entre as plantas", "Usar os caminhos demarcados", "Levar plantas como lembrança", "Deixar marcas nas árvores"),
+            q("Qual prática reduz o consumo de água?", 2, "Lavar o quintal com a mangueira aberta", "Deixar a água correr antes de cada uso", "Fechar a torneira ao escovar os dentes", "Repetir a lavagem de áreas já limpas"),
+            q("Qual objeto substitui vários descartáveis no dia a dia?", 0, "Garrafa reutilizável", "Copo de uso único", "Canudo embalado", "Talher descartável"),
+            q("Para observar um animal na natureza, é melhor...", 2, "Tentar atraí-lo oferecendo alimento", "Cercá-lo para conseguir uma boa foto", "Respeitar sua distância e seu caminho", "Aproximar o flash para destacar os olhos"),
+            q("Qual hábito evita desperdício de energia?", 1, "Ligar aparelhos sem necessidade", "Apagar luzes em cômodos vazios", "Manter a televisão ligada sem uso", "Deixar portas abertas com ar ligado"),
+            q("O consumo responsável começa ao...", 0, "Planejar o que é necessário", "Comprar para acumular estoque", "Preferir sempre a maior embalagem", "Substituir objetos ainda úteis"),
+            q("Por que evitar sair das trilhas demarcadas?", 3, "Para impedir a passagem de toda a fauna", "Para aumentar a coleta de plantas locais", "Para afastar os visitantes das nascentes", "Para reduzir danos ao solo e à vegetação"),
+            q("Uma atividade coletiva de cuidado ambiental é...", 3, "Abrir valas para esconder embalagens", "Plantar qualquer espécie sem orientação", "Retirar placas para ampliar o caminho", "Organizar a coleta segura de resíduos")
         },
         {
-            new Question("Ao perceber um incendio florestal, qual deve ser a prioridade?", new String[] { "Aproximar-se para filmar", "Afastar-se para um local seguro e chamar emergencia", "Tentar atravessar a fumaca", "Esconder o fogo" }, 1),
-            new Question("Por que nao se deve queimar folhas ou lixo?", new String[] { "O fogo pode se espalhar e gerar fumaça nociva", "Isso protege o solo", "A fumaça limpa o ar", "So e perigoso a noite" }, 0),
-            new Question("O que pode aumentar o risco de queimadas?", new String[] { "Vegetacao seca e vento", "Coleta seletiva", "Plantio de mudas", "Chuva leve" }, 0),
-            new Question("Como ajudar a prevenir incendios na mata?", new String[] { "Jogar bitucas no chao", "Fazer fogueiras sem supervisao", "Nao deixar fontes de ignicao e seguir orientacoes locais", "Queimar entulho" }, 2),
-            new Question("Qual impacto uma queimada pode causar?", new String[] { "Perda de habitat e morte de animais", "Aumento permanente de agua limpa", "Protecao de ninhos", "Nenhum efeito no solo" }, 0),
-            new Question("Se o fogo estiver proximo, para onde ir?", new String[] { "Para a direcao da fumaca", "Para uma area segura, longe do fogo e da fumaca", "Para dentro da vegetacao fechada", "Para perto das chamas" }, 1),
-            new Question("Por que a vegetacao nativa e importante?", new String[] { "Abriga especies e protege o solo e a agua", "Serve apenas como decoracao", "Impede toda a chuva", "Nao tem funcao ecologica" }, 0),
-            new Question("Quem deve combater um grande incendio florestal?", new String[] { "Qualquer pessoa sem equipamento", "Equipes treinadas e servicos de emergencia", "Criancas desacompanhadas", "Animais da mata" }, 1)
+            q("Qual combinação favorece a propagação do fogo?", 0, "Vegetação seca e vento", "Solo úmido e chuva", "Névoa e mata encharcada", "Chuva e baixa temperatura"),
+            q("Ao perceber um incêndio, a prioridade é...", 1, "Entrar na fumaça para procurar a origem", "Ir para um local seguro e pedir ajuda", "Chegar mais perto para registrar imagens", "Atravessar as chamas pelo trecho curto"),
+            q("Uma consequência das queimadas é a...", 2, "Recuperação imediata de todos os ninhos", "Eliminação permanente de todo o calor", "Perda de habitats e de seres vivos", "Criação instantânea de novas nascentes"),
+            q("Que material pode iniciar fogo na vegetação seca?", 3, "Folha molhada", "Pedra fria", "Terra úmida", "Bituca acesa"),
+            q("Queimar lixo ao ar livre pode produzir...", 0, "Fumaça nociva e risco de incêndio", "Ar limpo sem qualquer partícula", "Adubo pronto para todas as culturas", "Água própria para consumo imediato"),
+            q("A vegetação nativa protege o solo ao...", 3, "Eliminar toda a água que chega ao chão", "Impedir qualquer crescimento de raízes", "Aumentar o impacto direto de cada chuva", "Reduzir a erosão com cobertura e raízes"),
+            q("O combate a um incêndio florestal cabe a...", 1, "Visitantes sem equipamento", "Equipes treinadas", "Crianças em passeio escolar", "Qualquer pessoa curiosa"),
+            q("Após uma queimada, a recuperação de um habitat...", 2, "Ocorre inteira na mesma noite", "Dispensa a presença de plantas", "Exige tempo e condições adequadas", "Torna todas as espécies iguais")
         },
         {
-            new Question("Onde descartar uma garrafa reciclavel?", new String[] { "Em um rio", "Na coleta seletiva apropriada", "No meio da trilha", "Enterrada na mata" }, 1),
-            new Question("O que fazer com pilhas e baterias usadas?", new String[] { "Levar a um ponto de coleta apropriado", "Jogar no lixo organico", "Deixar na praia", "Quebrar e enterrar" }, 0),
-            new Question("Como reduzir o uso de embalagens descartaveis?", new String[] { "Usar sacolas reutilizaveis", "Pedir embalagem extra", "Jogar embalagens no chao", "Comprar itens duplos" }, 0),
-            new Question("Por que o plastico no ambiente e perigoso?", new String[] { "Pode ferir animais e contaminar ecossistemas", "Alimenta todos os animais", "Desaparece imediatamente", "Purifica a agua" }, 0),
-            new Question("Qual e a ordem mais conhecida dos 3Rs?", new String[] { "Recolher, rasgar, remover", "Reduzir, reutilizar, reciclar", "Repor, regar, remover", "Repetir, reter, raspar" }, 1),
-            new Question("Restos de alimentos podem ser destinados a...", new String[] { "Compostagem, quando disponivel", "Bueiros", "Rios", "Trilhas" }, 0),
-            new Question("O que fazer se encontrar lixo perigoso na trilha?", new String[] { "Tocar para identificar", "Deixar no local e avisar a equipe responsavel", "Chutar para longe", "Queimar" }, 1),
-            new Question("Qual escolha ajuda a manter rios limpos?", new String[] { "Descartar oleo na pia", "Nao jogar residuos e usar descarte correto", "Lavar embalagens no rio", "Jogar papel na agua" }, 1)
+            q("Qual objeto deve ir a um ponto de coleta específico?", 1, "Casca de fruta", "Pilha usada", "Folha caída", "Resto de salada"),
+            q("A sequência dos 3Rs é...", 0, "Reduzir, reutilizar, reciclar", "Recolher, remover, rasgar", "Repor, regar, recolocar", "Repetir, reter, reconstruir"),
+            q("Antes de reciclar uma embalagem, convém...", 3, "Enterrá-la junto de outros materiais", "Misturar o conteúdo com folhas secas", "Largá-la perto de um bueiro fechado", "Consultar a orientação da coleta local"),
+            q("Uma sacola reutilizável ajuda a...", 2, "Aumentar o número de embalagens", "Misturar todos os resíduos da casa", "Reduzir o uso de descartáveis", "Impedir qualquer tipo de coleta"),
+            q("Resíduos plásticos podem prejudicar animais por...", 0, "Ingestão ou aprisionamento", "Produção de alimento natural", "Criação de abrigo sempre seguro", "Aumento da qualidade da água"),
+            q("Compostagem aproveita principalmente...", 3, "Pilhas e baterias", "Latas e ferramentas", "Vidros e lâmpadas", "Restos orgânicos"),
+            q("Ao encontrar material cortante na trilha, é melhor...", 1, "Segurá-lo sem proteção até chegar à saída", "Evitar o contato e avisar a equipe local", "Empurrá-lo com o pé para perto do mato", "Quebrá-lo em partes para facilitar a coleta"),
+            q("Reutilizar um recipiente significa...", 2, "Deixá-lo em qualquer ponto da cidade", "Transformá-lo sempre em matéria-prima", "Usá-lo novamente para uma função útil", "Misturá-lo a todos os restos da cozinha")
         }
     };
+    private static Question q(String prompt, int answer, String... options) { return new Question(prompt, options, answer); }
 }

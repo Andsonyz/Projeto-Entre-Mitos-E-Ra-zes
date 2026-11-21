@@ -37,13 +37,13 @@ O número após o prefixo define a ordem da cena. A ordenação é numérica: `2
 
 - Um capítulo sem vídeos configurados abre diretamente sua introdução.
 - O novo jogo abre a seleção de personagem antes do prólogo. Os vídeos do capítulo aparecem ao chegar à fase e ao reiniciá-la pela seleção de fases.
-- Apenas `MediaPlayer.onEndOfMedia`, após a reprodução começar, conclui uma cena. Todas as cenas precisam terminar antes da apresentação da fase. `Enter`, `Espaço` e cliques não antecipam esse término.
+- Uma cena avança por término natural (`MediaPlayer.onEndOfMedia`) ou por escolha explícita de **Pular esta cena**, no canto superior direito, também acessível por `P`. O pulo afeta apenas a cena atual e está disponível durante carregamento, reprodução e recuperação de falha. `Enter`, `Espaço` e cliques fora desse botão não pulam o vídeo. Segurar `P` não pula várias cenas.
 - Física, controles, inimigos, animações e relógio da fase ficam suspensos durante carregamento e reprodução. A localização do arquivo acontece fora das threads da interface; um indicador mostra o carregamento.
 - O último frame permanece no player até o callback preparar a próxima tela. O player anterior é liberado na troca de cena ou ao sair. Identificadores de sessão/cena descartam callbacks repetidos ou antigos.
 - `Esc` cancela sem liberar a fase: retorna à seleção no prólogo de um novo jogo, ou ao menu nas sequências retomadas e nos capítulos.
 - Arquivos ausentes, incompatíveis ou com falha exibem **Tentar novamente** e **Voltar**. O erro detalhado aparece no terminal. Mouse e teclado podem usar os botões; `Esc` volta e `Enter` tenta novamente quando nenhum botão tem foco.
 - O limite de 12 segundos detecta falha de preparação ou travamento; nunca conclui a cena. Falhas nativas `UNKNOWN` recebem uma tentativa automática após 200 ms; se persistirem, a recuperação fica a cargo do usuário.
-- Os campos `pendingPrologue` e `pendingChapter` no save permanecem ativos até a conclusão natural. Cancelar, falhar ou fechar o jogo mantém a sequência pendente. **Continuar** recomeça a sequência pendente desde sua primeira cena. Após concluída, ela não se repete ao continuar.
+- Os campos `pendingPrologue` e `pendingChapter` no save permanecem ativos até todas as cenas terminarem ou serem puladas explicitamente. Cancelar, falhar ou fechar mantém a sequência pendente. **Continuar** recomeça a sequência pendente desde sua primeira cena. Após concluída, ela não se repete ao continuar.
 - Saves antigos sem esses campos conservam o comportamento anterior de retomada, abrindo a apresentação da fase. Não há novo formato ou arquivo de save.
 
 ## Formato dos arquivos
@@ -68,4 +68,4 @@ Para verificar com JavaFX 25.0.1:
 .\scripts\test-cinematics.ps1 -JavaFxPath 'lib/javafx'
 ```
 
-Os testes cobrem a leitura de sequências por capítulo, a ordem numérica, as legendas UTF-8, a reprodução integral das duas cenas, o bloqueio do avanço manual, a conclusão única, o cancelamento, os callbacks antigos e a recuperação de arquivos ausentes ou corrompidos. A suíte completa também verifica suspensão da fase e retomada de vídeos pendentes pelo save. Os avisos de arquivo ausente/corrompido são esperados nos testes de recuperação.
+Os testes de cinema cobrem sequências, ordem, legendas, reprodução natural, bloqueio de entradas sem ação de pulo, conclusão única, cancelamento, callbacks antigos e recuperação. `CinematicSkipRegressionTest`, incluído em `test-project.ps1 -Suite Gameplay`, verifica o pulo por tecla, botão e API, repetição da tecla, descarte de player e pulo após falha. A campanha completa também verifica suspensão da fase e retomada pelo save. Avisos de arquivos ausentes/corrompidos são esperados nos testes de recuperação.

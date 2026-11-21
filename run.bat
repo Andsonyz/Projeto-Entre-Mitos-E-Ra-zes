@@ -1,8 +1,7 @@
 @echo off
-setlocal
+setlocal EnableDelayedExpansion
 set "PROJECT_DIR=%~dp0"
-set "OUTPUT_DIR=%PROJECT_DIR%out"
-set "SOURCE_LIST=%OUTPUT_DIR%\sources.txt"
+set "OUTPUT_DIR=%PROJECT_DIR%out\runtime"
 set "JAVAFX_MODULES=javafx.controls,javafx.media,javafx.swing"
 
 where java >nul 2>nul
@@ -30,18 +29,8 @@ if not exist "%PROJECT_DIR%lib\javafx\javafx-base-25.0.1-win.jar" (
     exit /b 1
 )
 
-if not exist "%OUTPUT_DIR%" mkdir "%OUTPUT_DIR%"
-if exist "%SOURCE_LIST%" del "%SOURCE_LIST%"
-for /r "%PROJECT_DIR%src\main\java" %%F in (*.java) do echo "%%F">>"%SOURCE_LIST%"
-
-javac -encoding UTF-8 --module-path "%PROJECT_DIR%lib\javafx" --add-modules "%JAVAFX_MODULES%" -d "%OUTPUT_DIR%" @"%SOURCE_LIST%"
-set "BUILD_RESULT=%ERRORLEVEL%"
-del "%SOURCE_LIST%"
-if not "%BUILD_RESULT%"=="0" exit /b %BUILD_RESULT%
-
-if exist "%PROJECT_DIR%Image" xcopy "%PROJECT_DIR%Image" "%OUTPUT_DIR%\Image" /E /I /Y >nul
-if exist "%PROJECT_DIR%src\main\resources" xcopy "%PROJECT_DIR%src\main\resources\*" "%OUTPUT_DIR%\" /E /I /Y >nul
-if exist "%PROJECT_DIR%Videos" xcopy "%PROJECT_DIR%Videos" "%OUTPUT_DIR%\Videos" /E /I /Y >nul
+powershell -NoProfile -ExecutionPolicy Bypass -File "%PROJECT_DIR%scripts\build-project.ps1"
+if errorlevel 1 exit /b 1
 
 cd /d "%PROJECT_DIR%"
 java -cp "%OUTPUT_DIR%" --module-path "%PROJECT_DIR%lib\javafx" --add-modules "%JAVAFX_MODULES%" --enable-native-access=javafx.graphics,javafx.media br.com.raizes.Main

@@ -19,6 +19,17 @@ public final class AssetManager {
 
     private AssetManager() { }
 
+    /** Fresh stream per playback loop; works both in a JAR and in the source checkout. */
+    public static InputStream open(String path) throws IOException {
+        String resourcePath = normalize(path);
+        InputStream input = AssetManager.class.getClassLoader().getResourceAsStream(resourcePath);
+        if (input != null) return input;
+        for (File candidate : fileCandidates(path, resourcePath)) {
+            if (candidate.isFile()) return Files.newInputStream(candidate.toPath());
+        }
+        throw new IOException("Recurso não encontrado: " + path);
+    }
+
     public static BufferedImage image(String path) {
         String resourcePath = normalize(path);
         try (InputStream input = AssetManager.class.getClassLoader().getResourceAsStream(resourcePath)) {

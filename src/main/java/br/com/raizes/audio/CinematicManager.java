@@ -32,7 +32,7 @@ import javafx.scene.media.MediaView;
 import javafx.util.Duration;
 import javax.swing.SwingUtilities;
 
-/** Completion means natural end of every scene; cancellation and failure never complete a playlist. */
+/** A scene advances at natural end or explicit skip; cancellation and failure never complete a playlist. */
 public final class CinematicManager {
     public enum PlaybackState { IDLE, LOADING, PLAYING, FAILED, COMPLETED }
 
@@ -41,6 +41,7 @@ public final class CinematicManager {
     private final JFXPanel panel = new JFXPanel();
     private final AtomicLong sequence = new AtomicLong();
     private final AtomicBoolean sessionOpen = new AtomicBoolean();
+    private final CompletableFuture<Void> ready = new CompletableFuture<>();
     private volatile PlaybackState state = PlaybackState.IDLE;
     // Remaining playback state is confined to the JavaFX thread.
     private final PauseTransition startupTimeout = new PauseTransition(Duration.seconds(12));
@@ -50,13 +51,15 @@ public final class CinematicManager {
     private VBox statusBox;
     private ProgressIndicator progress;
     private HBox recovery;
+    private Button skipButton;
     private MediaPlayer player;
     private List<CinematicScene> scenes = List.of();
     private Runnable onFinished;
     private String sequenceTitle;
-    private boolean active;
+    private boolean active, skipHeld;
     private int sceneIndex, retryCount;
-    private long activeSequence, sceneRevision;
+    private long activeSequence;
+    private volatile long sceneRevision;
 
     public CinematicManager(Consumer<String> onError) { this(onError, () -> { }); }
 
@@ -66,11 +69,16 @@ public final class CinematicManager {
         panel.setBounds(0, 0, GameConfig.W, GameConfig.H);
         panel.setVisible(false);
         Platform.setImplicitExit(false);
-        Platform.runLater(this::initializePanel);
+        Platform.runLater(() -> {
+            try { initializePanel(); ready.complete(null); }
+            catch (RuntimeException | LinkageError error) { ready.completeExceptionally(error); }
+        });
     }
 
     public Component panel() { return panel; }
     public PlaybackState state() { return state; }
+    /** Complete before attaching the JFXPanel to a visible Swing window. */
+    public CompletableFuture<Void> ready() { return ready.copy(); }
 
     public void start(List<CinematicScene> playlist, String heading, Runnable finished) {
         List<CinematicScene> snapshot = List.copyOf(playlist);
@@ -86,6 +94,7 @@ public final class CinematicManager {
             sceneIndex = 0;
             retryCount = 0;
             active = true;
+            skipHeld = false;
             onSwingThread(() -> {
                 if (request == sequence.get() && !snapshot.isEmpty()) {
                     panel.setVisible(true);
@@ -108,6 +117,24 @@ public final class CinematicManager {
 
     public void cancel() { stop(true); }
     public void dispose() { stop(false); }
+
+    /** The queued request targets only the scene revision observed by the caller. */
+    public void skipScene() {
+        long request = sequence.get();
+        long revision = sceneRevision;
+        Platform.runLater(() -> {
+            if (request == sequence.get()) advanceScene(revision);
+        });
+    }
+
+    private void advanceScene(long revision) {
+        if (!isCurrent(revision)) return;
+        sceneRevision++;
+        sceneIndex++;
+        retryCount = 0;
+        if (sceneIndex == scenes.size()) finishPlaylist();
+        else loadCurrentScene();
+    }
 
     private void stop(boolean notifyCancellation) {
         boolean wasOpen = sessionOpen.getAndSet(false);
@@ -168,16 +195,26 @@ public final class CinematicManager {
         statusBox = new VBox(24, progress, statusMessage, recovery);
         statusBox.setAlignment(Pos.CENTER);
         statusBox.setStyle("-fx-background-color: rgba(0, 0, 0, 0.92); -fx-padding: 36px;");
-        root.getChildren().addAll(mediaView, overlay, statusBox);
+        skipButton = new Button("Pular esta cena  •  P");
+        skipButton.setOnAction(event -> advanceScene(sceneRevision));
+        skipButton.setStyle("-fx-background-color: rgba(8,22,23,0.88); -fx-text-fill: #ffd85c; -fx-font-size: 17px; -fx-padding: 12px 18px;");
+        StackPane.setAlignment(skipButton, Pos.TOP_RIGHT);
+        StackPane.setMargin(skipButton, new Insets(22));
+        root.getChildren().addAll(mediaView, overlay, statusBox, skipButton);
         Scene scene = new Scene(root, GameConfig.W, GameConfig.H);
         scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
             if (event.getCode() == KeyCode.ESCAPE) { cancel(); event.consume(); }
+            else if (event.getCode() == KeyCode.P) {
+                if (!skipHeld) { skipHeld = true; advanceScene(sceneRevision); }
+                event.consume();
+            }
             else if (event.getCode() == KeyCode.ENTER || event.getCode() == KeyCode.SPACE) {
                 if (state == PlaybackState.FAILED && scene.getFocusOwner() instanceof Button) return;
                 if (state == PlaybackState.FAILED) retry();
                 event.consume(); // Input cannot synthesize a natural end of media.
             }
         });
+        scene.addEventFilter(KeyEvent.KEY_RELEASED, event -> { if (event.getCode() == KeyCode.P) skipHeld = false; });
         panel.setScene(scene);
     }
 
@@ -185,7 +222,7 @@ public final class CinematicManager {
         long revision = ++sceneRevision;
         releasePlayer();
         if (!active || activeSequence != sequence.get()) return;
-        if (sceneIndex >= scenes.size()) { finishNaturally(); return; }
+        if (sceneIndex >= scenes.size()) { finishPlaylist(); return; }
         CinematicScene current = scenes.get(sceneIndex);
         title.setText(sequenceTitle + "  •  CENA " + (sceneIndex + 1));
         caption.setText(current.caption());
@@ -216,12 +253,7 @@ public final class CinematicManager {
             nextPlayer.setOnHalted(() -> failScene(revision, path, nextPlayer.getError()));
             nextPlayer.setOnEndOfMedia(() -> {
                 if (!isCurrent(revision) || state != PlaybackState.PLAYING) return;
-                // Invalidate this scene before accepting another end callback.
-                sceneRevision++;
-                sceneIndex++;
-                retryCount = 0;
-                if (sceneIndex == scenes.size()) finishNaturally();
-                else loadCurrentScene();
+                advanceScene(revision);
             });
             nextPlayer.setOnPlaying(() -> {
                 if (!isCurrent(revision)) return;
@@ -262,7 +294,7 @@ public final class CinematicManager {
             return;
         }
         String message = "Não foi possível reproduzir " + new File(path).getName()
-            + ". Tente novamente ou volte à tela anterior.";
+            + ". Tente novamente, pule esta cena ou volte à tela anterior.";
         showStatus(PlaybackState.FAILED, message, true);
         System.err.println("[Entre Mitos e Raízes] " + path + ": " + error);
         long request = activeSequence;
@@ -279,7 +311,7 @@ public final class CinematicManager {
         statusBox.setVisible(true);
     }
 
-    private void finishNaturally() {
+    private void finishPlaylist() {
         if (!active || activeSequence != sequence.get()) return;
         active = false;
         state = PlaybackState.COMPLETED;

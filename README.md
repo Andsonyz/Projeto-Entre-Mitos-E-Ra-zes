@@ -6,11 +6,14 @@ Desenvolvido em **Java**, com **Swing/AWT** para a interface e **JavaFX Media** 
 
 ## Funcionalidades
 
-- Quatro fases com objetivos, diálogos e desafios educativos.
+- Quatro capítulos com objetivos e desafios educativos, seguidos por uma fase comemorativa com os quatro guardiões.
 - Dois slots de save, continuação da campanha e seleção de fases desbloqueadas.
 - Prólogo em vídeo, mapa de progresso e menu de pausa.
 - Seleção de personagem: masculino disponível e feminino identificado como “Em breve”.
 - Ajustes de tamanho do texto e alto contraste.
+- Carregamento inicial em segundo plano, com arte própria antes do menu.
+- Fundos específicos para caça, parkour, queimadas e resíduos.
+- Música ambiente em looping: menu e floresta, com silêncio durante as cinemáticas.
 
 ## Requisitos e compatibilidade
 
@@ -19,11 +22,11 @@ O projeto está configurado para **Windows** e possui duas opções de execuçã
 | Opção | JDK | JavaFX | Local das bibliotecas |
 | --- | --- | --- | --- |
 | Script `run.bat` | 25 ou superior | 25.0.1 | `lib/javafx/` |
-| VS Code | 27 | 27 | `lib/javafx-sdk-27/lib/` |
+| VS Code | 27 | 25.0.1 | `lib/javafx/` |
 
-A compilação e a reprodução das duas cenas foram verificadas com **JDK 27 nas duas versões do JavaFX**. Com JavaFX 25.0.1, também foi verificada a compilação com `--release 25`. A execução no JDK 25 não foi testada.
+A compilação com `--release 25`, a abertura, os fundos e os testes de apresentação foram verificados com **JDK 27 nas duas versões do JavaFX**. A execução no JDK 25 não foi testada. As versões JavaFX atuais apresentam limitações conhecidas de vídeo: crescimento de memória no 27 e falhas intermitentes de preparação no 25.0.1. Os resultados estão discriminados no [registro da atualização](docs/atualizacao-jogo.md); as dependências foram mantidas.
 
-Mantenha as pastas `Image/`, `Videos/` e `src/main/resources/` nos locais originais. O projeto compila diretamente com `javac`, sem Maven ou Gradle.
+Mantenha as pastas `Image/`, `Audio/` e `Videos/` junto ao projeto. O projeto compila diretamente com `javac`, sem Maven ou Gradle. Os recursos de interface antes separados em `src/main/resources/` foram reunidos em `Image/`.
 
 ## Como executar
 
@@ -31,8 +34,8 @@ Mantenha as pastas `Image/`, `Videos/` e `src/main/resources/` nos locais origin
 
 1. Abra a pasta raiz do projeto no VS Code, com o suporte a Java instalado.
 2. Confira o caminho do JDK 27 em `.vscode/settings.json`.
-3. Verifique se o SDK JavaFX 27 está em `lib/javafx-sdk-27/`.
-4. Em **Executar e Depurar**, selecione **Entre Mitos e Raizes - JavaFX 27** e pressione **F5**.
+3. Verifique se o JavaFX 25.0.1 está em `lib/javafx/`.
+4. Em **Executar e Depurar**, selecione **Entre Mitos e Raizes - JavaFX 25.0.1** e pressione **F5**.
 
 O arquivo `.vscode/launch.json` define a classe principal, os módulos JavaFX e o diretório de execução.
 
@@ -44,7 +47,15 @@ Com `java` e `javac` da mesma versão no `PATH` e o JavaFX 25.0.1 em `lib/javafx
 .\run.bat
 ```
 
-O script compila os fontes, copia os recursos para `out/` e inicia o jogo. Ele utiliza **JavaFX 25.0.1**, mesmo quando o JDK instalado é o 27.
+O script usa `scripts/build-project.ps1` para compilar e copiar os recursos para `out/runtime/`, depois inicia o jogo. Ele utiliza **JavaFX 25.0.1**, mesmo quando o JDK instalado é o 27. O VS Code utiliza `out/vscode/` para suas classes, separado da distribuição e dos testes.
+
+Para apenas compilar e preparar a distribuição:
+
+```powershell
+.\scripts\build-project.ps1
+```
+
+A abertura exibe `Image/Cenarios/Menu/Carregamento.png` durante a preparação das imagens e animações. O menu só aparece após a conclusão dos recursos e do painel JavaFX, sem tempo de espera artificial. Os áudios e vídeos longos são lidos durante a reprodução para limitar o uso de memória.
 
 ## Controles
 
@@ -54,10 +65,11 @@ O script compila os fontes, copia os recursos para `out/` e inicia o jogo. Ele u
 | `Shift` + movimento | Andar; solte `Shift` para correr |
 | `W`, seta para cima ou `Espaço` | Pular |
 | `Enter` | Confirmar e avançar diálogos |
-| `E` | Interagir com armadilhas, fontes e focos de incêndio; avançar diálogos |
+| `E` | Conversar com guardiões e interagir com armadilhas, fontes e focos; avançar diálogos |
+| `P` ou botão **Pular esta cena** | Pular somente a cena atual do vídeo |
 | `M` | Abrir ou fechar o mapa |
 | `F5` | Salvar durante a exploração |
-| `Esc` | Pausar ou voltar |
+| `Esc` | Pausar ou voltar; sair de conversas e questionários para retomar a trilha |
 | `1` a `4` | Selecionar uma resposta no quiz; confirmar com `Enter` ou `Espaço` |
 | `Delete` / `R` | Excluir / reiniciar a campanha do slot selecionado, após confirmação |
 | Mouse | Navegar pelas telas e interagir com elementos próximos |
@@ -66,31 +78,36 @@ O script compila os fontes, copia os recursos para `out/` e inicia o jogo. Ele u
 
 | Fase | Guardião | Objetivo |
 | --- | --- | --- |
-| Os Rastros da Caça | Curupira | Coletar 12 sementes e desativar 3 armadilhas. |
+| Os Rastros da Caça | Curupira | Coletar as 17 sementes e desativar as 3 armadilhas. |
 | A Travessia do Saci | Saci | Atravessar plataformas e obstáculos. |
-| Entre Cinzas e Raízes | Caipora | Encher o balde nas fontes e apagar todos os focos. |
-| Os Rastros do Lixo | Negrinho do Pastoreio | Recolher 10 resíduos. |
+| Entre Cinzas e Raízes | Caipora | Encher o balde nas fontes e apagar os 9 focos. |
+| Os Rastros do Lixo | Negrinho do Pastoreio | Recolher os 11 resíduos. |
+| Celebração da Floresta | Os quatro guardiões | Explorar o mapa final e conversar com cada guardião; sem perigos ou novas coletas. |
 
-Cada fase apresenta a lenda do guardião e termina com um diálogo e um quiz. São sorteadas cinco perguntas por rodada, de um banco de oito por fase. Uma resposta incorreta reinicia a rodada.
+Cada capítulo apresenta a lenda do guardião e termina com um diálogo e um quiz. São sorteadas cinco perguntas por rodada, de um banco de oito por fase; a ordem das alternativas também muda. Uma resposta incorreta reinicia a rodada. `Esc` ou **Voltar à trilha** permite deixar a conversa ou o quiz. Ao retornar ao desafio, a rodada recomeça.
+
+Ao chegar à saída com tarefas pendentes, o guardião informa as quantidades que faltam. Concluir os objetivos e acertar as cinco questões abre um agradecimento antes do próximo capítulo. Após o quarto, a celebração usa `BackgroundFinal.png` e permite conversar novamente com os guardiões por `E` ou clicando neles quando estiver próximo. Campanhas antigas já concluídas também têm acesso a essa área.
 
 ### Vídeos antes dos capítulos
 
-Novo jogo segue o fluxo **slot → nome → seleção de personagem → prólogo completo → vídeo do capítulo, se configurado → apresentação da fase → exploração**. O masculino começa selecionado; o feminino permanece bloqueado. `Esc` na seleção retorna ao nome.
+Novo jogo segue o fluxo **slot → nome → seleção de personagem → vídeos configurados (com pulo opcional) → apresentação da fase → exploração**. O masculino começa selecionado; o feminino permanece bloqueado. `Esc` na seleção retorna ao nome.
 
-Os vídeos `Videos/cena1.mp4` e `Videos/cena2.mp4` compõem o prólogo. Para adicionar cenas ao prólogo ou antes de cada capítulo, edite **[`Videos/cinematics.properties`](Videos/cinematics.properties)**:
+O catálogo atual utiliza `Videos/Cenas/CenaFase1.mp4` a `CenaFase4.mp4`, antes dos capítulos correspondentes. Para adicionar cenas ao prólogo ou antes de cada capítulo, edite **[`Videos/cinematics.properties`](Videos/cinematics.properties)**:
 
 ```properties
 chapter.2.1.video=Videos/capitulo2/entrada.mp4
 chapter.2.1.caption=O caminho do Saci começa aqui.
 ```
 
-As cenas avançam somente ao terminar naturalmente. Durante a reprodução, a fase permanece suspensa. `Esc` cancela e volta à tela anterior, sem liberar a fase. Uma falha oferece **Tentar novamente** e **Voltar**. Veja o [guia de vídeos](docs/VIDEOS.md) para configuração e recuperação.
+Cada cena avança ao terminar ou quando o jogador escolhe **Pular esta cena** (`P`). Durante a reprodução, a fase permanece suspensa. `Esc` cancela e volta à tela anterior, mantendo a sequência pendente. Uma falha oferece **Tentar novamente**, **Pular esta cena** e **Voltar**. Veja o [guia de vídeos](docs/VIDEOS.md) para configuração e recuperação.
 
 ### Progresso salvo
 
 Os dois slots são armazenados em `%USERPROFILE%\.entremitoseraizes\saves`, nos arquivos `slot-1.properties` e `slot-2.properties`. Eles registram a fase, as fases desbloqueadas, a posição, as vidas e os objetivos concluídos.
 
 A escolha do personagem e os vídeos pendentes usam esses mesmos arquivos. Continuar retoma uma sequência não concluída; uma sequência concluída não se repete. Saves antigos sem esses campos continuam compatíveis e adotam o masculino.
+
+Os campos opcionais `quizComplete`, `traversalComplete` e `celebration` preservam o agradecimento pendente, a travessia do Saci e a posição na celebração. Os índices dos quatro capítulos permanecem iguais; saves antigos já concluídos abrem a área comemorativa.
 
 ## Organização do código
 
@@ -99,8 +116,9 @@ Os fontes ficam em `src/main/java/br/com/raizes/`:
 | Componente | Responsabilidade |
 | --- | --- |
 | `Main.java` | Inicialização da janela e do jogo. |
+| `core/GameAssets.java` e `LoadingScreen.java` | Preparação dos recursos em segundo plano, progresso e recuperação de falha na abertura. |
 | `core/` | Loop, física e campanha em `Game`; seleção de telas em `drawScreen()`; desenho do mundo em `WorldRenderer`. |
-| `audio/` | Sequências em `CinematicCatalog`, cenas em `CinematicScene` e reprodução em `CinematicManager`. |
+| `audio/` | Vídeos em `CinematicManager` e sequências em `CinematicCatalog`; música ambiente em `AmbientAudio`. |
 | `character/` | Catálogo de personagens, recorte das folhas e animações por tempo, com âncora nos pés. |
 | `assets/AssetManager.java` | Carregamento de imagens e localização de arquivos. |
 | `config/GameConfig.java` | Dimensões, constantes e filtros visuais. |
@@ -108,7 +126,9 @@ Os fontes ficam em `src/main/java/br/com/raizes/`:
 | `persistence/SaveManager.java` | Leitura, gravação e exclusão dos saves. |
 | `quiz/QuestionBank.java` | Banco de perguntas de cada fase. |
 
-Os recursos visuais ficam em `Image/` e `src/main/resources/`; os vídeos, em `Videos/`. A pasta `out/` contém arquivos gerados pela compilação e é ignorada pelo Git.
+Os recursos visuais ficam em `Image/`, os WAVs em `Audio/` e os vídeos em `Videos/`. `Image/Cenarios/Menu/` concentra menu, carregamento, slots, pausa e configurações. A pasta `out/` contém arquivos gerados e é ignorada pelo Git.
+
+`Phase.background` associa cada capítulo a uma imagem de `Image/Cenarios/BackGrounds/`. `BackgroundFinal.png` é usado exclusivamente na celebração. Greg e as artes de vilões permanecem preservados para uso futuro. Para trocar músicas, mantenha os nomes `Audio/MenuTheme.wav` e `Audio/ForestTheme.wav`, em WAV PCM compatível com Java Sound. A reprodução usa um canal e um buffer de 4 KiB, sem carregar cada música inteira na memória.
 
 Para adicionar fases, revise as regras em `Game`, os desenhos em `WorldRenderer`, as definições em `Phase` e as perguntas em `QuestionBank`. Os saves usam índices de fases e de objetos; alterações nessa ordem exigem atenção à compatibilidade com campanhas existentes.
 
@@ -120,5 +140,22 @@ Para verificar vídeos, campanha, controles e saves, execute a suíte com JavaFX
 .\scripts\test-project.ps1
 .\scripts\test-project.ps1 -JavaFxPath 'lib/javafx' -Release 25
 ```
+
+Para verificar esta atualização de apresentação, fundos, áudio e abertura:
+
+```powershell
+.\scripts\test-project.ps1 -Suite Presentation -Release 25
+.\scripts\test-project.ps1 -Suite Gameplay -Release 25
+```
+
+A suíte `Gameplay` acrescenta objetivos, guardiões, agradecimentos, plataformas, quiz, pulo de cenas, celebração e a campanha completa. O runtime padrão agora é o JavaFX 25.0.1 já existente. O SDK 27 permanece em `lib/javafx-sdk-27` para diagnóstico; pode ser selecionado explicitamente com `-JavaFxPath lib/javafx-sdk-27/lib`, mantendo a limitação nativa registrada.
+
+Essa suíte também abre e fecha uma janela real para conferir a transição de carregamento para menu. O teste opcional da saída de áudio física, após a compilação dos testes, é:
+
+```powershell
+java --module-path lib/javafx --add-modules javafx.controls,javafx.media,javafx.swing -cp out/project-tests/classes br.com.raizes.audio.AmbientAudioDeviceTest
+```
+
+Os resultados atuais, a limpeza de arquivos e as limitações conhecidas de reprodução/memória das versões JavaFX mantidas estão no [registro da atualização](docs/atualizacao-jogo.md).
 
 Os testes usam saves temporários e geram imagens em `out/project-tests/artifacts/`. Cobrem término natural dos vídeos, cancelamento, recuperação, suspensão da fase, seleção, sprites e saves antigos. Consulte os [resultados e limitações da atualização](docs/VALIDACAO-VIDEO-PERSONAGENS.md), os [detalhes dos personagens e recursos](docs/PERSONAGENS.md) e o [registro anterior de revisão](docs/REVISAO.md).

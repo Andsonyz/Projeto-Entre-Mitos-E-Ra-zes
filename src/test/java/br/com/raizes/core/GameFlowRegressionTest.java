@@ -46,9 +46,10 @@ public final class GameFlowRegressionTest {
         Path configuration = directory.resolve("cinematics.properties");
         Path saveDirectory = directory.resolve("saves");
         Files.writeString(configuration, """
-            prologue.1.video=Videos/cena1.mp4
-            chapter.1.1.video=Videos/cena2.mp4
-            chapter.2.1.video=Videos/cena1.mp4
+            chapter.1.1.video=Videos/Cenas/CenaFase1.mp4
+            chapter.2.1.video=Videos/Cenas/CenaFase2.mp4
+            chapter.3.1.video=Videos/Cenas/CenaFase3.mp4
+            chapter.4.1.video=Videos/Cenas/CenaFase4.mp4
             """, StandardCharsets.UTF_8);
         SaveManager saves = new SaveManager(saveDirectory);
         Game game = edt(() -> {
@@ -73,10 +74,9 @@ public final class GameFlowRegressionTest {
             press(game, KeyEvent.VK_ENTER);
             expectScreen(game, GameState.CHARACTER_SELECT);
             press(game, KeyEvent.VK_ENTER);
-            awaitVideo(game, "cena1.mp4");
+            awaitVideo(game, "CenaFase1.mp4");
             assertSuspendedDuringVideo(game);
             check(saves.read(0).getProperty("name").equals("Teste"), "A campanha deve preservar o apelido.");
-            awaitVideo(game, "cena2.mp4");
             awaitScreen(game, GameState.PHASE_INTRO);
 
             Properties checkpoint = null;
@@ -86,6 +86,8 @@ public final class GameFlowRegressionTest {
                 expectScreen(game, GameState.WORLD);
                 if (phase == 0) {
                     edt(() -> { game.x = 3030; invoke(game, "updateWorld", new Class<?>[] { double.class }, 0.016); return null; });
+                    expectScreen(game, GameState.DIALOGUE);
+                    press(game, KeyEvent.VK_ESCAPE);
                     expectScreen(game, GameState.WORLD);
                 }
                 edt(() -> {
@@ -119,13 +121,15 @@ public final class GameFlowRegressionTest {
                     press(game, KeyEvent.VK_ENTER);
                 }
                 check(answered == 5, "Cada fase deve exigir cinco respostas corretas.");
+                expectScreen(game, GameState.DIALOGUE);
+                for (int line = 0; line < 4 && edt(() -> game.screen) == GameState.DIALOGUE; line++) press(game, KeyEvent.VK_ENTER);
                 if (phase < 3) {
                     check(edt(() -> game.vy == 0 && game.camera == 0 && game.held.isEmpty()),
                         "Movimento e câmera devem ser reiniciados ao trocar de fase.");
                     check(saves.read(0).getProperty("phase").equals(String.valueOf(phase + 1)),
                         "A mudança de fase deve ser salva antes da introdução.");
+                    awaitVideo(game, "CenaFase" + (phase + 2) + ".mp4");
                     if (phase == 0) {
-                        awaitVideo(game, "cena1.mp4");
                         check(Boolean.parseBoolean(saves.read(0).getProperty("pendingChapter")),
                             "Vídeo pendente precisa sobreviver a cancelamento ou fechamento.");
                     }
@@ -138,7 +142,8 @@ public final class GameFlowRegressionTest {
                     }
                 }
             }
-            expectScreen(game, GameState.END);
+            expectScreen(game, GameState.WORLD);
+            check(edt(() -> game.celebrationActive), "A campanha deve terminar na fase comemorativa.");
             check(Boolean.parseBoolean(saves.read(0).getProperty("campaignComplete")), "A conclusão deve ser salva.");
 
             // Invalid numeric values must not poison world coordinates or camera calculations.
@@ -146,7 +151,7 @@ public final class GameFlowRegressionTest {
             checkpoint.setProperty("y", "Infinity");
             check(saves.write(0, checkpoint), "O checkpoint de teste deve ser gravado.");
             verifySlotIsolation(saves);
-            press(game, KeyEvent.VK_ENTER);
+            edt(() -> { invoke(game, "returnToMenu", new Class<?>[] { }); return null; });
             openContinue(game);
             press(game, KeyEvent.VK_ENTER);
             expectScreen(game, GameState.PHASE_INTRO);
@@ -164,13 +169,16 @@ public final class GameFlowRegressionTest {
             press(game, KeyEvent.VK_ENTER);
             expectScreen(game, GameState.PHASE_SELECT);
             press(game, KeyEvent.VK_UP);
+            check(edt(() -> integerField(game, "phaseSelectIndex")) == 1,
+                "Após voltar da fase bloqueada, a seleção deve estar na fase 2 desbloqueada.");
             press(game, KeyEvent.VK_ENTER);
             expectScreen(game, GameState.SAVE_CONFIRM);
             press(game, KeyEvent.VK_ENTER);
-            awaitVideo(game, "cena1.mp4");
+            awaitVideo(game, "CenaFase2.mp4");
             awaitScreen(game, GameState.PHASE_INTRO);
-            check(edt(() -> game.x == 110 && game.y == 500 && game.lives == 3 && game.coinsCollected == 0),
-                "Reiniciar uma fase deve restaurar seu estado inicial.");
+            check(edt(() -> game.currentPhase == 1 && game.x == 110 && game.y == 500
+                && game.lives == 3 && game.coinsCollected == 0),
+                "Reiniciar deve abrir a fase escolhida e restaurar seu estado inicial.");
         } finally {
             edt(() -> { game.timer.stop(); game.cinematicManager.dispose(); return null; });
             FutureTask<Void> released = new FutureTask<>(() -> null);
@@ -283,8 +291,9 @@ public final class GameFlowRegressionTest {
                 Field field = CinematicManager.class.getDeclaredField("player");
                 field.setAccessible(true);
                 MediaPlayer player = (MediaPlayer) field.get(game.cinematicManager);
-                return player != null && player.getMedia().getSource().endsWith(name)
+                boolean playing = player != null && player.getMedia().getSource().endsWith(name)
                     && player.getStatus() == MediaPlayer.Status.PLAYING;
+                return playing;
             });
             Platform.runLater(check);
             if (check.get(5, TimeUnit.SECONDS)) return;
@@ -303,7 +312,7 @@ public final class GameFlowRegressionTest {
     }
 
     private static void awaitScreen(Game game, GameState screen) throws Exception {
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(45);
         while (System.nanoTime() < deadline) {
             if (edt(() -> game.screen) == screen) return;
             Thread.sleep(25);

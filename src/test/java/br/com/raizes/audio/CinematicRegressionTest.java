@@ -24,12 +24,13 @@ import javax.imageio.ImageIO;
 
 /** Real decoder regressions: natural completion, responsive input, failure recovery and cancellation. */
 public final class CinematicRegressionTest {
-    private static final CinematicScene FIRST = new CinematicScene("Videos/cena1.mp4", "Primeira cena");
-    private static final CinematicScene SECOND = new CinematicScene("Videos/cena2.mp4", "Segunda cena");
+    private static final CinematicScene FIRST = new CinematicScene("Videos/Cenas/CenaFase1.mp4", "Primeira cena");
+    private static final CinematicScene SECOND = new CinematicScene("Videos/Cenas/CenaFase2.mp4", "Segunda cena");
 
     public static void main(String[] args) {
         int result = 0;
         try {
+            productionCatalogUsesAvailableChapterVideos();
             catalogConfiguration();
             manualInputMustNotComplete();
             naturalPlayback();
@@ -42,12 +43,25 @@ public final class CinematicRegressionTest {
         System.exit(result);
     }
 
+    private static void productionCatalogUsesAvailableChapterVideos() throws Exception {
+        CinematicCatalog catalog = new CinematicCatalog();
+        check(catalog.prologue().isEmpty(), "O prÃ³logo nÃ£o deve referenciar os dois arquivos removidos.");
+        for (int chapter = 1; chapter <= 4; chapter++) {
+            String expected = "Videos/Cenas/CenaFase" + chapter + ".mp4";
+            check(catalog.beforeChapter(chapter).size() == 1,
+                "O capÃ­tulo " + chapter + " deve ter uma cena configurada.");
+            check(catalog.beforeChapter(chapter).get(0).video().equals(expected),
+                "O capÃ­tulo " + chapter + " deve usar " + expected + ".");
+            check(Files.isRegularFile(Path.of(expected)), "VÃ­deo configurado ausente: " + expected);
+        }
+    }
+
     private static void catalogConfiguration() throws Exception {
         Path file = Files.createTempFile("raizes-cinematics-test-", ".properties");
         try {
             Files.writeString(file, """
-                prologue.10.video=Videos/cena2.mp4
-                prologue.2.video=Videos/cena1.mp4
+                prologue.10.video=Videos/Cenas/CenaFase2.mp4
+                prologue.2.video=Videos/Cenas/CenaFase1.mp4
                 prologue.2.caption=Árvores e raízes
                 prologue.3.video=
                 chapter.2.1.video=Videos/saci.mp4
@@ -68,7 +82,7 @@ public final class CinematicRegressionTest {
         AtomicInteger finished = new AtomicInteger();
         try {
             manager.start(List.of(FIRST), "INTEGRAL", finished::incrementAndGet);
-            MediaPlayer playing = awaitVideo(manager, "cena1.mp4");
+            MediaPlayer playing = awaitVideo(manager, "CenaFase1.mp4");
             fx(() -> {
                 JFXPanel panel = (JFXPanel) manager.panel();
                 for (KeyCode key : List.of(KeyCode.ENTER, KeyCode.SPACE, KeyCode.RIGHT)) {
@@ -97,14 +111,14 @@ public final class CinematicRegressionTest {
                 finished.incrementAndGet();
                 done.countDown();
             });
-            MediaPlayer firstPlayer = awaitVideo(manager, "cena1.mp4");
+            MediaPlayer firstPlayer = awaitVideo(manager, "CenaFase1.mp4");
             Runnable staleEnd = fx(firstPlayer::getOnEndOfMedia);
-            check(fx(() -> firstPlayer.getMedia().getWidth()) == 1024, "Vídeo não foi decodificado.");
-            MediaPlayer secondPlayer = awaitVideo(manager, "cena2.mp4");
+            check(fx(() -> firstPlayer.getMedia().getWidth()) == 1280, "Vídeo não foi decodificado.");
+            MediaPlayer secondPlayer = awaitVideo(manager, "CenaFase2.mp4");
             Runnable lastEnd = fx(secondPlayer::getOnEndOfMedia);
             fx(() -> { staleEnd.run(); return null; });
             check(fx(() -> player(manager)) == secondPlayer, "Callback antigo avançou a cena seguinte.");
-            check(done.await(15, TimeUnit.SECONDS), "A sequência não terminou naturalmente.");
+            check(done.await(40, TimeUnit.SECONDS), "A sequência não terminou naturalmente.");
             fx(() -> { lastEnd.run(); lastEnd.run(); return null; });
             SwingUtilities.invokeAndWait(() -> { });
             check(finished.get() == 1 && errors.get() == 0, "A conclusão deve ocorrer uma única vez, sem erros.");
@@ -119,7 +133,7 @@ public final class CinematicRegressionTest {
         AtomicInteger finished = new AtomicInteger();
         try {
             manager.start(List.of(FIRST), "ANTIGA", finished::incrementAndGet);
-            MediaPlayer first = awaitVideo(manager, "cena1.mp4");
+            MediaPlayer first = awaitVideo(manager, "CenaFase1.mp4");
             Runnable oldEnd = fx(first::getOnEndOfMedia);
             Runnable oldError = fx(first::getOnError);
             manager.cancel();
@@ -134,7 +148,7 @@ public final class CinematicRegressionTest {
             SwingUtilities.invokeAndWait(() -> { });
             check(cancelled.get() == 1, "Cancelar deve ser idempotente.");
             manager.start(List.of(SECOND), "NOVA", finished::incrementAndGet);
-            MediaPlayer next = awaitVideo(manager, "cena2.mp4");
+            MediaPlayer next = awaitVideo(manager, "CenaFase2.mp4");
             fx(() -> { oldEnd.run(); oldError.run(); return null; });
             check(finished.get() == 0 && fx(() -> player(manager)) == next, "Callback de sessão cancelada afetou a nova.");
         } finally { dispose(manager); }
@@ -156,7 +170,7 @@ public final class CinematicRegressionTest {
             Files.copy(Path.of(SECOND.video()), video);
             manager.retry();
             awaitVideo(manager, "recovered.mp4");
-            check(done.await(10, TimeUnit.SECONDS) && finished.get() == 1, "Retry deve completar apenas após reproduzir o vídeo.");
+            check(done.await(35, TimeUnit.SECONDS) && finished.get() == 1, "Retry deve completar apenas após reproduzir o vídeo.");
         } finally { dispose(manager); Files.deleteIfExists(video); Files.deleteIfExists(directory); }
     }
 
@@ -198,12 +212,13 @@ public final class CinematicRegressionTest {
     }
 
     private static MediaPlayer awaitVideo(CinematicManager manager, String name) throws Exception {
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(40);
         while (System.nanoTime() < deadline) {
             MediaPlayer current = fx(() -> {
                 MediaPlayer candidate = player(manager);
-                return candidate != null && candidate.getMedia().getSource().endsWith(name)
-                    && candidate.getStatus() == MediaPlayer.Status.PLAYING ? candidate : null;
+                if (candidate == null || !candidate.getMedia().getSource().endsWith(name)
+                        || candidate.getStatus() != MediaPlayer.Status.PLAYING) return null;
+                return candidate;
             });
             if (current != null) return current;
             Thread.sleep(25);
