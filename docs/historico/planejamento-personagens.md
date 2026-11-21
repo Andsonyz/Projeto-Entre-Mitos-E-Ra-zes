@@ -1,6 +1,5 @@
 # Vídeo e personagens — Implementation Plan
 
-> **For agentic workers:** Use superpowers:executing-plans to implement this plan task-by-task. Preserve the user's explicit instruction to implement in the currently open project.
 
 **Goal:** Concluir os vídeos antes de liberar a fase, trocar Greg pelo aventureiro masculino e acrescentar seleção com feminino bloqueado.
 
@@ -65,6 +64,6 @@
 - Implementação concluída: nenhum avanço manual ou erro chama a conclusão; fase e relógio ficam suspensos fora de WORLD. Os quatro PNGs foram copiados e conferidos por SHA-256.
 - RED observado para Enter antecipando vídeo, ausência de seleção, cancelamento duplicado e Continue dispensando vídeo pendente; os casos corrigidos passaram nas regressões.
 - Revisão independente: corrigidos os indicadores persistidos pendingPrologue/pendingChapter e o teclado do botão Voltar. Reinício de capítulo também preserva prólogo pendente.
-- Suítes completas finais aprovadas com JavaFX 27 e JavaFX 25.0.1 / JDK 27 / --release 25. Resultados consolidados em docs/VALIDACAO-VIDEO-PERSONAGENS.md; logs em out/project-tests/javafx25.log e javafx27.log.
+- Suítes completas finais aprovadas com JavaFX 27 e JavaFX 25.0.1 / JDK 27 / --release 25. Resultados consolidados em docs/historico/validacao-personagens.md; logs em out/project-tests/javafx25.log e javafx27.log.
 - Verificação visual: folhas originais, contato de 56 poses, cartões, fase e tela de erro inspecionados. Controle nativo do Windows indisponível mesmo após reinicializar a ferramenta; observação interativa da janela permanece pendente.
 - Decoder apresentou UNKNOWN intermitente. FFmpeg decodificou os dois arquivos sem erro; programa mínimo JavaFX 25 passou 12 aberturas e quatro reproduções completas. Não foi aplicada mudança especulativa de codec, biblioteca ou renderizador.

@@ -45,11 +45,11 @@ public final class GameAssets {
         treeImages[0] = loadTree("Image/Cenarios/Elementos/arvore01.png");
         treeImages[1] = loadTree("Image/Cenarios/Elementos/arvore02.png");
         treeImages[2] = loadTree("Image/Cenarios/Elementos/arvore03.png");
-        seedImage = fitImageToBox(cropOpaqueImage(image("Image/Cenarios/Elementos/semente.png")), 32, 34);
-        trashImage = fitImageToBox(cropOpaqueImage(image("Image/Cenarios/Elementos/lixo.png")), 66, 54);
-        trapImage = fitImageToBox(cropOpaqueImage(image("Image/Cenarios/Elementos/armadilha.png")), 60, 60);
-        lakeImage = fitImageToBox(cropOpaqueImage(image("Image/Cenarios/Elementos/lago.png")), 158, 88);
-        fireImage = fitImageToBox(cropOpaqueImage(image("Image/Cenarios/Elementos/fogo.png")), 96, 82);
+        seedImage = fitImageToBox(cropOpaqueImage(image("Image/Cenarios/Elementos/semente.png", 512, 512)), 32, 34);
+        trashImage = fitImageToBox(cropOpaqueImage(image("Image/Cenarios/Elementos/lixo.png", 512, 512)), 66, 54);
+        trapImage = fitImageToBox(cropOpaqueImage(image("Image/Cenarios/Elementos/armadilha.png", 512, 512)), 60, 60);
+        lakeImage = fitImageToBox(cropOpaqueImage(image("Image/Cenarios/Elementos/lago.png", 640, 256)), 158, 88);
+        fireImage = fitImageToBox(cropOpaqueImage(image("Image/Cenarios/Elementos/fogo.png", 512, 512)), 96, 82);
         BufferedImage groundSource = image("Image/Cenarios/Elementos/chao.png");
         if (groundSource != null) {
             int renderHeight = 120 + GROUND_OVERDRAW;
@@ -65,7 +65,7 @@ public final class GameAssets {
         slotImages[0] = cropOpaqueImage(image("Image/Cenarios/Menu/Slots/Slot-1.png"));
         slotImages[1] = cropOpaqueImage(image("Image/Cenarios/Menu/Slots/Slot-2.png"));
         pauseTitleImage = cropOpaqueImage(image("Image/Cenarios/Menu/Pausa/pausa.png"));
-        pauseIndicatorImage = removeDarkBackground(image("Image/Cenarios/Menu/Pausa/indicador.jpg"));
+        pauseIndicatorImage = fitImageToBox(removeDarkBackground(image("Image/Cenarios/Menu/Pausa/indicador.jpg", 128, 128)), 32, 44);
         settingsTitleImage = cropOpaqueImage(image("Image/Cenarios/Menu/Configuracoes/configuracao.png"));
         menuImages[0] = image("Image/Cenarios/Menu/NovoGame.png");
         menuImages[1] = image("Image/Cenarios/Menu/Continuar.png");
@@ -108,6 +108,12 @@ public final class GameAssets {
 
     static BufferedImage image(String path) {
         BufferedImage result = AssetManager.image(path);
+        if (result == null) throw new IllegalStateException("Imagem ausente ou inválida: " + path);
+        return result;
+    }
+
+    static BufferedImage image(String path, int maxWidth, int maxHeight) {
+        BufferedImage result = AssetManager.image(path, maxWidth, maxHeight);
         if (result == null) throw new IllegalStateException("Imagem ausente ou inválida: " + path);
         return result;
     }

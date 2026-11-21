@@ -56,10 +56,24 @@ public final class CinematicSkipRegressionTest {
             manager.start(List.of(new CinematicScene("Videos/Cenas/CenaFase1.mp4","Cancelar")),"CANCELAR",completed::incrementAndGet);
             manager.cancel();manager.skipScene();fx(()->null);edt(()->null);
             check(cancelled.get()==1 && completed.get()==2,"Cancelar virou conclusão/pulo");
+            manager.start(List.of(new CinematicScene("Videos/simulation-missing-1.mp4",""),
+                new CinematicScene("Videos/simulation-missing-2.mp4","")),"SIMULAÇÃO",completed::incrementAndGet);
+            await(()->manager.state()==CinematicManager.PlaybackState.FAILED,"Falha da fixture de F8");
+            fx(()->{key(manager,KeyEvent.KEY_PRESSED,KeyCode.F8);check(index(manager)==0,"F8 ativo fora da simulação");return null;});
+            manager.setSimulationMode(true);
+            fx(()->{key(manager,KeyEvent.KEY_PRESSED,KeyCode.F8);check(index(manager)==1,"F8 não avançou na simulação");
+                key(manager,KeyEvent.KEY_PRESSED,KeyCode.F8);check(index(manager)==1,"F8 repetido avançou outra cena");
+                key(manager,KeyEvent.KEY_RELEASED,KeyCode.F8);return null;});
+            manager.skipScene();fx(()->null);edt(()->null);
+            check(completed.get()==3,"Conclusão da simulação não foi única");
+            manager.setSimulationMode(false);
         } finally {manager.dispose();fx(()->null);}
     }
     private static void key(CinematicManager manager,javafx.event.EventType<KeyEvent> type){
-        Event.fireEvent(((JFXPanel)manager.panel()).getScene(),new KeyEvent(type,"p","p",KeyCode.P,false,false,false,false));
+        key(manager,type,KeyCode.P);
+    }
+    private static void key(CinematicManager manager,javafx.event.EventType<KeyEvent> type,KeyCode code){
+        Event.fireEvent(((JFXPanel)manager.panel()).getScene(),new KeyEvent(type,"","",code,false,false,false,false));
     }
     private static int index(CinematicManager manager)throws Exception{return (Integer)field(manager,"sceneIndex");}
     private static Object field(Object target,String name)throws Exception{var field=target.getClass().getDeclaredField(name);field.setAccessible(true);return field.get(target);}

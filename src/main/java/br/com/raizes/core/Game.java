@@ -5,6 +5,7 @@ import br.com.raizes.model.Phase;
 import br.com.raizes.model.Question;
 import br.com.raizes.model.Thing;
 import br.com.raizes.model.TreeDecoration;
+import br.com.raizes.model.GameCredits;
 import br.com.raizes.audio.AmbientAudio;
 import static br.com.raizes.core.GameAssets.resizeImage;
 import br.com.raizes.audio.CinematicManager;
@@ -48,10 +49,6 @@ import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 
 public final class Game extends JPanel {
-
-
-
-
     final Set<Integer> held = new HashSet<>();
     final List<Rectangle> platforms = new ArrayList<>();
     final List<Thing> coins = new ArrayList<>();
@@ -66,6 +63,15 @@ public final class Game extends JPanel {
     private GuardianConversation conversation = GuardianConversation.CHALLENGE;
     private int dialogueGuardian;
     boolean celebrationActive;
+    boolean simulationMode;
+    static final Rectangle SIMULATION_CONTROL = new Rectangle(20, H - 28, W - 40, 24);
+    private int simulationGuardian;
+    private final boolean lowPower = Boolean.getBoolean("raizes.lowPower")
+        || Runtime.getRuntime().maxMemory() <= 192L * 1024 * 1024
+        || Runtime.getRuntime().availableProcessors() <= 2;
+    private static final long LOW_POWER_FRAME_NANOS = 1_000_000_000L / 30;
+    private long nextWorldPaint;
+    private final Rectangle playerBody = new Rectangle(0, 0, PLAYER_WIDTH, PLAYER_HEIGHT);
     private boolean phaseQuizComplete, traversalComplete;
     private final Map<Integer, Font> fonts = new java.util.HashMap<>();
     final Timer timer;
@@ -176,14 +182,17 @@ public final class Game extends JPanel {
         addKeyListener(new KeyAdapter() {
             @Override public void keyPressed(KeyEvent e) {
                 boolean firstPress = held.add(e.getKeyCode());
-                if ((screen != GameState.CINEMATIC && screen != GameState.TRAP_CHALLENGE) || firstPress)
+                if ((screen != GameState.CINEMATIC && screen != GameState.TRAP_CHALLENGE) || firstPress) {
                     keyPressedGame(e.getKeyCode());
+                    if (screen != GameState.WORLD) repaint();
+                }
             }
             @Override public void keyReleased(KeyEvent e) { held.remove(e.getKeyCode()); }
             @Override public void keyTyped(KeyEvent e) {
                 if (screen == GameState.NAME && !nameConfirm && name.length() < 18) {
                     char c = e.getKeyChar();
                     if (Character.isLetterOrDigit(c) || c == ' ' || c == '-' || c == '_') name += c;
+                    repaint();
                 }
             }
         });
@@ -198,6 +207,7 @@ public final class Game extends JPanel {
                 if (e.getButton() == MouseEvent.BUTTON1) {
                     Point point = toGameCoordinates(e.getX(), e.getY());
                     handleMouseClick(point.x, point.y);
+                    repaint();
                 }
             }
         });
@@ -326,20 +336,35 @@ public final class Game extends JPanel {
         double dt = Math.max(0, (now - lastTickNanos) / 1_000_000_000.0);
         lastTickNanos = now;
         updateAmbientAudio();
-        updateMenuScale();
+        boolean menuVisible = screen == GameState.MENU || screen == GameState.EXTRAS
+            || screen == GameState.SAVE_OPTIONS || screen == GameState.PHASE_SELECT
+            || screen == GameState.SAVE_CONFIRM || settingsReturn == GameState.MENU
+                && (screen == GameState.SETTINGS || screen == GameState.CONTROLS);
+        boolean menuChanged = menuVisible && updateMenuScale();
         if (screen == GameState.WORLD) updateWorld(dt);
         else if (screen == GameState.TRAP_CHALLENGE) updateTrapChallenge(dt);
-        if (toastUntil < System.currentTimeMillis()) toast = "";
-        repaint();
+        boolean toastChanged = !toast.isEmpty() && toastUntil < System.currentTimeMillis();
+        if (toastChanged) toast = "";
+        boolean animated = screen == GameState.WORLD || screen == GameState.TRAP_CHALLENGE
+            || screen == GameState.CHARACTER_SELECT;
+        if (animated && (!lowPower || now >= nextWorldPaint)) {
+            // Carry the deadline forward so 16 ms timer quantization does not turn 30 fps into 20.
+            nextWorldPaint = (now - nextWorldPaint > LOW_POWER_FRAME_NANOS ? now : nextWorldPaint)
+                + LOW_POWER_FRAME_NANOS;
+            repaint();
+        } else if (menuChanged || toastChanged) repaint();
     }
 
-    private void updateMenuScale() {
+    private boolean updateMenuScale() {
+        boolean changed = false;
         int selected = screen == GameState.MENU ? menuIndex : -1;
         for (int i = 0; i < menuScale.length; i++) {
             double target = i == selected ? 1.08 : 1.0;
+            changed |= menuScale[i] != target;
             menuScale[i] += (target - menuScale[i]) * 0.24;
             if (Math.abs(target - menuScale[i]) < 0.001) menuScale[i] = target;
         }
+        return changed;
     }
 
     private void updateWorld(double dt) {
@@ -357,7 +382,8 @@ public final class Game extends JPanel {
         double oldY = y;
         y += vy * dt;
         onGround = false;
-        Rectangle body = new Rectangle((int)x + 2, (int)y, PLAYER_WIDTH, PLAYER_HEIGHT);
+        Rectangle body = playerBody;
+        body.setLocation((int)x + 2, (int)y);
         for (Rectangle platform : platforms) {
             int surfaceY = platform.y == GROUND_Y ? GROUND_Y : platform.y + PLATFORM_SURFACE_OFFSET;
             boolean overlapsPlatform = body.x < platform.x + platform.width && body.x + body.width > platform.x;
@@ -365,13 +391,12 @@ public final class Game extends JPanel {
                 y = surfaceY - PLAYER_HEIGHT; vy = 0; onGround = true; body.y = (int)y;
             }
         }
-        if (y > H + 100) loseLife();
-        for (Thing coin : coins) if (!coin.hit && body.intersects(new Rectangle(coin.x - 12, coinY(coin), 24, 24))) { coin.hit = true; coinsCollected++; }
+        if (y > H + 100) { loseLife(); return; }
+        for (Thing coin : coins) if (!coin.hit && body.intersects(coin.x - 12, coinY(coin), 24, 24)) { coin.hit = true; coinsCollected++; }
         if (currentPhase == 2) {
             for (Thing fire : fires) {
                 if (fire.hit) continue;
-                Rectangle flameBounds = new Rectangle(fire.x - 30, fire.y - 30, 60, 72);
-                if (body.intersects(flameBounds)) {
+                if (body.intersects(fire.x - 30, fire.y - 30, 60, 72)) {
                     loseLife();
                     showToast("As chamas te atingiram! Tente apagá-las de uma distância segura.");
                     return;
@@ -382,8 +407,7 @@ public final class Game extends JPanel {
             if (enemy.hit) continue;
             enemy.x += (int) Math.round(Math.sin(elapsed + enemy.x) * ENEMY_SPEED);
             int enemyY = GROUND_Y - 48;
-            Rectangle enemyRect = new Rectangle(enemy.x - 20, enemyY, 40, 48);
-            if (body.intersects(enemyRect)) {
+            if (body.intersects(enemy.x - 20, enemyY, 40, 48)) {
                 boolean stompedFromAbove = vy >= 0 && oldY + PLAYER_HEIGHT <= enemyY + 14;
                 if (stompedFromAbove) {
                     enemy.hit = true;
@@ -589,6 +613,7 @@ public final class Game extends JPanel {
     }
 
     private void keyPressedGame(int key) {
+        if (key == KeyEvent.VK_F8 && simulationMode) { advanceSimulation(); return; }
         if (screen == GameState.MENU) menuKey(key);
         else if (screen == GameState.SLOTS) slotsKey(key);
         else if (screen == GameState.SAVE_OPTIONS) saveOptionsKey(key);
@@ -611,7 +636,11 @@ public final class Game extends JPanel {
         else if (screen == GameState.PAUSE) pauseKey(key);
         else if (screen == GameState.SETTINGS) settingsKey(key);
         else if (screen == GameState.CONTROLS) { if (key == KeyEvent.VK_ESCAPE || key == KeyEvent.VK_ENTER || key == KeyEvent.VK_SPACE) screen = GameState.SETTINGS; }
-        else if (screen == GameState.EXTRAS) { if (key == KeyEvent.VK_ESCAPE || key == KeyEvent.VK_ENTER || key == KeyEvent.VK_SPACE) returnToMenu(); }
+        else if (screen == GameState.EXTRAS) {
+            if (key == KeyEvent.VK_T) startSimulation();
+            else if (key == KeyEvent.VK_C) openCredits();
+            else if (key == KeyEvent.VK_ESCAPE || key == KeyEvent.VK_ENTER || key == KeyEvent.VK_SPACE) returnToMenu();
+        }
         else if (screen == GameState.DIALOGUE) dialogueKey(key);
         else if (screen == GameState.BATTLE) battleKey(key);
         else if (screen == GameState.END) { if (key == KeyEvent.VK_ENTER || key == KeyEvent.VK_ESCAPE) returnToMenu(); }
@@ -623,7 +652,7 @@ public final class Game extends JPanel {
         if (key == KeyEvent.VK_DOWN || key == KeyEvent.VK_S) menuIndex = nextMenuIndex(menuIndex, 1);
         if ((key == KeyEvent.VK_ENTER || key == KeyEvent.VK_SPACE) && menuIndex >= 0) {
             if (menuIndex == 1 && firstSave() < 0) return;
-            if (menuIndex == 0 || menuIndex == 1) { choosingContinue = menuIndex == 1; slotIndex = choosingContinue && firstSave() >= 0 ? firstSave() : 0; screen = GameState.SLOTS; }
+            if (menuIndex == 0 || menuIndex == 1) { simulationMode = false; cinematicManager.setSimulationMode(false); choosingContinue = menuIndex == 1; slotIndex = choosingContinue && firstSave() >= 0 ? firstSave() : 0; screen = GameState.SLOTS; }
             else if (menuIndex == 2) { settingsReturn = GameState.MENU; screen = GameState.SETTINGS; }
             else if (menuIndex == 3) screen = GameState.EXTRAS;
             else { ambientAudio.close(); cinematicManager.dispose(); System.exit(0); }
@@ -751,6 +780,7 @@ public final class Game extends JPanel {
         else if (key == KeyEvent.VK_F5) saveGame();
         else if (key == KeyEvent.VK_M) screen = GameState.MAP;
         else if (key == KeyEvent.VK_E) interactPhase();
+        else if (key == KeyEvent.VK_ENTER && celebrationActive) finishCampaign();
     }
 
     private void pauseKey(int key) {
@@ -767,9 +797,17 @@ public final class Game extends JPanel {
         screen = GameState.MENU;
         menuIndex = 0;
         choosingContinue = false;
+        simulationMode = false;
+        cinematicManager.setSimulationMode(false);
     }
 
     private void cancelCinematic() {
+        if (cinematicReturn == GameState.MENU) {
+            returnToMenu();
+            requestFocusInWindow();
+            repaint();
+            return;
+        }
         cinematicEpoch++;
         cinematicManager.dispose();
         held.clear();
@@ -801,9 +839,12 @@ public final class Game extends JPanel {
         cinematicManager.panel().setBounds(x, y, width, height);
     }
 
-    private boolean inside(int x, int y, int bx, int by, int bw, int bh) { return new Rectangle(bx, by, bw, bh).contains(x, y); }
+    private boolean inside(int x, int y, int bx, int by, int bw, int bh) {
+        return x >= bx && y >= by && x < bx + bw && y < by + bh;
+    }
 
     private void updateMouseHover(int x, int y) {
+        int previousSelection = hoveredOption();
         int cursor = java.awt.Cursor.DEFAULT_CURSOR;
         if (screen == GameState.MENU) { int index = menuAt(x, y); if (index == 1 && !hasAnySave()) index = -1; menuIndex = index; if (index >= 0) cursor = java.awt.Cursor.HAND_CURSOR; }
         else if (screen == GameState.SLOTS) { if (slotCardAt(x, y) >= 0 || slotActionAt(x, y) >= 0) { int slot = slotCardAt(x, y); if (slot >= 0) slotIndex = slot; cursor=java.awt.Cursor.HAND_CURSOR; } }
@@ -823,10 +864,29 @@ public final class Game extends JPanel {
         else if (screen == GameState.DIALOGUE || screen == GameState.PHASE_INTRO || screen == GameState.END || screen == GameState.EXTRAS || screen == GameState.CONTROLS) cursor=java.awt.Cursor.HAND_CURSOR;
         else if (screen == GameState.MAP) cursor=java.awt.Cursor.HAND_CURSOR;
         else if (screen == GameState.WORLD) { double worldX=x+camera; if(guardianAt(worldX,y)>=0||currentPhase==0&&traps.stream().anyMatch(t->!t.hit&&Math.abs(worldX-t.x)<42)||currentPhase==2&&(Math.abs(worldX-145)<38||Math.abs(worldX-1650)<38||fires.stream().anyMatch(f->!f.hit&&Math.abs(worldX-f.x)<42)))cursor=java.awt.Cursor.HAND_CURSOR; }
-        setCursor(java.awt.Cursor.getPredefinedCursor(cursor)); repaint();
+        if (simulationMode && SIMULATION_CONTROL.contains(x,y)) cursor=java.awt.Cursor.HAND_CURSOR;
+        if (celebrationActive && screen == GameState.WORLD && inside(x,y,1040,12,220,50)) cursor=java.awt.Cursor.HAND_CURSOR;
+        setCursor(java.awt.Cursor.getPredefinedCursor(cursor));
+        if (hoveredOption() != previousSelection) repaint();
+    }
+
+    private int hoveredOption() {
+        return switch (screen) {
+            case MENU, PAUSE -> menuIndex;
+            case SLOTS -> slotIndex;
+            case CHARACTER_SELECT -> characterChoice.ordinal();
+            case SAVE_OPTIONS -> saveOptionIndex;
+            case PHASE_SELECT -> phaseSelectIndex;
+            case SAVE_CONFIRM, SETTINGS -> settingsIndex;
+            case BATTLE -> battleChoice;
+            default -> -1;
+        };
     }
 
     private void handleMouseClick(int x, int y) {
+        if (simulationMode && screen != GameState.END && SIMULATION_CONTROL.contains(x,y)) {
+            advanceSimulation(); return;
+        }
         switch (screen) {
             case MENU -> { int i=menuAt(x,y); if(i==1&&!hasAnySave()){menuIndex=-1;repaint();return;} if(i>=0){menuIndex=i;menuKey(KeyEvent.VK_ENTER);} }
             case SLOTS -> {
@@ -846,6 +906,7 @@ public final class Game extends JPanel {
                 }
             }
             case WORLD -> {
+                if (celebrationActive && inside(x,y,1040,12,220,50)) { finishCampaign(); return; }
                 double worldX = x + camera;
                 int guardian = guardianAt(worldX, y);
                 if (guardian >= 0) {
@@ -877,7 +938,11 @@ public final class Game extends JPanel {
                 } else if (inside(x,y,440,575,400,45)) screen=settingsReturn;
             }
             case CONTROLS -> screen=GameState.SETTINGS;
-            case EXTRAS -> returnToMenu();
+            case EXTRAS -> {
+                if (inside(x,y,315,440,650,55)) startSimulation();
+                else if (inside(x,y,315,505,650,50)) openCredits();
+                else returnToMenu();
+            }
             case PAUSE -> { int option = pauseOptionAt(x, y); if (option >= 0) { menuIndex = option; pauseKey(KeyEvent.VK_ENTER); } }
             case MAP -> { if(inside(x,y,400,520,480,65))screen=GameState.WORLD; }
             case DIALOGUE -> { if(inside(x,y,270,605,330,42))leaveGuardian(); else if(inside(x,y,100,490,1080,165))advanceDialogue(); }
@@ -1020,6 +1085,80 @@ public final class Game extends JPanel {
         startOpening();
     }
 
+    void startSimulation() {
+        cinematicEpoch++;
+        cinematicManager.dispose();
+        simulationMode = true;
+        cinematicManager.setSimulationMode(true);
+        simulationGuardian = 0;
+        selectedCharacter = CharacterDefinition.MALE;
+        playerAnimator = new PlayerAnimator(selectedCharacter);
+        name = "Simulação";
+        startGame();
+        repaint();
+    }
+
+    /** Exercises the production transitions; never writes a campaign save. */
+    boolean advanceSimulation() {
+        if (!simulationMode) return false;
+        switch (screen) {
+            case CINEMATIC -> cinematicManager.skipScene();
+            case PHASE_INTRO -> screen = GameState.WORLD;
+            case WORLD, TRAP_CHALLENGE -> {
+                resetTransientMovement();
+                y = GROUND_Y - PLAYER_HEIGHT;
+                if (celebrationActive) {
+                    if (simulationGuardian == CELEBRATION_GUARDIANS.length) finishCampaign();
+                    else {
+                        x = CELEBRATION_GUARDIANS[simulationGuardian++] - PLAYER_WIDTH / 2.0;
+                        camera = clamp(x - 340, 0, WORLD_W - W);
+                        interactPhase();
+                    }
+                } else {
+                    coins.forEach(item -> item.hit = true);
+                    traps.forEach(item -> item.hit = true);
+                    fires.forEach(item -> item.hit = true);
+                    coinsCollected = coins.size();
+                    traversalComplete = true;
+                    x = 3020;
+                    camera = WORLD_W - W;
+                    beginGuardianDialogue();
+                }
+            }
+            case DIALOGUE -> {
+                int remaining = dialogue.length + 1;
+                while (screen == GameState.DIALOGUE && remaining-- > 0) advanceDialogue();
+            }
+            case BATTLE -> {
+                for (int i = 0; i < QUESTIONS_PER_ROUND && screen == GameState.BATTLE; i++) {
+                    battleChoice = quizQuestions.get(quizIndex).correctOption();
+                    battleKey(KeyEvent.VK_ENTER);
+                }
+            }
+            case END -> returnToMenu();
+            case PAUSE, MAP -> screen = GameState.WORLD;
+            default -> { return false; }
+        }
+        held.clear();
+        repaint();
+        return true;
+    }
+
+    private void finishCampaign() {
+        if (!celebrationActive || !campaignComplete || screen != GameState.WORLD) return;
+        saveGame();
+        resetTransientMovement();
+        cinematicReturn = GameState.WORLD;
+        playCinematic(cinematicCatalog.ending(), "A FLORESTA SEGUE VIVA", this::openCredits);
+    }
+
+    private void openCredits() {
+        held.clear();
+        screen = GameState.END;
+        toast = "";
+        repaint();
+    }
+
     private void resetPhaseProgress(int phase) {
         celebrationActive = false;
         phaseQuizComplete = false;
@@ -1153,6 +1292,12 @@ public final class Game extends JPanel {
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             drawScreen(g);
             drawToast(g);
+            if (simulationMode && screen != GameState.CINEMATIC && screen != GameState.END) {
+                Rectangle control = SIMULATION_CONTROL;
+                drawStandardPanel(g, control.x, control.y, control.width, control.height);
+                drawCenteredText(g, "SIMULAÇÃO • F8 ou clique para avançar etapa • Progresso não será salvo",
+                    W / 2, control.y + 17, 12, new Color(255,216,92));
+            }
         } finally {
             g.dispose();
         }
@@ -1186,7 +1331,7 @@ public final class Game extends JPanel {
             case PAUSE -> { drawWorld(g); drawPause(g); }
             case MAP -> { drawWorld(g); drawMap(g); }
             case DIALOGUE -> { drawWorld(g); drawDialogue(g); }
-            case END -> { drawWorld(g); drawEnd(g); }
+            case END -> drawEnd(g);
             case CINEMATIC -> { /* The embedded JavaFX panel owns this screen. */ }
         }
     }
@@ -1500,14 +1645,18 @@ public final class Game extends JPanel {
     }
     private void drawControls(Graphics2D g) { g.setColor(new Color(0, 0, 0, 178)); g.fillRoundRect(250, 130, 780, 470, 18, 18); g.setColor(new Color(214,177,91,190)); g.drawRoundRect(250,130,780,470,18,18); drawText(g,"CONTROLES",520,205,29,new Color(255,216,92)); drawText(g,"A/D ou SETAS: correr",390,300,21,Color.WHITE); drawText(g,"W, SETA CIMA ou ESPACO: pular",390,355,21,Color.WHITE); drawText(g,"M: mapa   F5: salvar   Esc: pausar",390,410,20,Color.WHITE); drawCenteredText(g,"Clique ou pressione Esc para voltar",W/2,535,16,new Color(245,230,190)); }
     private void drawExtras(Graphics2D g) {
-        drawStandardPanel(g, 250, 165, 780, 390);
+        drawStandardPanel(g, 250, 145, 780, 470);
         drawCenteredText(g, "AJUDA E INFORMAÇÕES", W / 2, 238, 30, new Color(255, 216, 92));
         g.setColor(new Color(214, 177, 91, 120));
         g.drawLine(330, 265, 950, 265);
         drawParagraph(g,
             "Uma aventura inspirada nas lendas da floresta brasileira. Proteja a mata, respeite os animais e siga as orientações de cada guardião.",
             330, 325, 620, 32, Color.WHITE, 20);
-        drawCenteredText(g, "Clique fora ou pressione Esc para voltar", W / 2, 510, 16, new Color(245, 230, 190));
+        drawGoldSelectableOption(g, 315, 440, 650, 55, false);
+        drawCenteredText(g, "Simular campanha • T • não altera seus saves", W/2, 475, 18, Color.WHITE);
+        drawGoldSelectableOption(g, 315, 505, 650, 50, false);
+        drawCenteredText(g, "Créditos • C", W/2, 538, 18, Color.WHITE);
+        drawCenteredText(g, "Esc para voltar", W / 2, 587, 16, new Color(245, 230, 190));
     }
 
     private void drawSaveOptions(Graphics2D g) {
@@ -1586,6 +1735,10 @@ public final class Game extends JPanel {
 
     private void drawWorld(Graphics2D g) {
         worldRenderer.draw(g);
+        if (celebrationActive) {
+            drawGoldSelectableOption(g,1040,12,220,50,false);
+            drawCenteredText(g,"Encerrar • Enter",1150,44,15,Color.WHITE);
+        }
     }
 
     int coinY(Thing coin) {
@@ -1733,19 +1886,11 @@ public final class Game extends JPanel {
         g.fillRect(0, 0, W, H);
         drawStandardPanel(g, 130, 105, 1020, 510);
 
-        BufferedImage portrait = guardianImages[Phase.NEGRINHO.ordinal()];
-        if (portrait != null) drawImageFit(g, portrait, 175, 195, 300, 350);
-        g.setColor(new Color(214, 177, 91, 135));
-        g.drawLine(490, 175, 1090, 175);
-
-        drawCenteredText(g, "CAMPANHA CONCLUÍDA", 790, 225, 34, new Color(255, 216, 92));
-        drawParagraph(g,
-            "Você acompanhou Curupira, Saci, Caipora e Negrinho do Pastoreio e ajudou a proteger a floresta.",
-            525, 290, 555, 31, Color.WHITE, 20);
-        drawParagraph(g,
-            "A floresta floresce quando cada vida é respeitada. Cuidar da natureza hoje mantém vivas as histórias de amanhã.",
-            525, 390, 555, 31, new Color(227, 238, 219), 20);
-        drawCenteredText(g, "Obrigado por caminhar ao lado da natureza.", 790, 495, 17, new Color(255, 226, 125));
+        drawCenteredText(g, "ENTRE MITOS E RAÍZES", W/2, 190, 34, new Color(255,216,92));
+        drawCenteredText(g, "CRIADORES", W/2, 265, 23, new Color(255,226,125));
+        for (int i=0; i<GameCredits.CREATORS.size(); i++)
+            drawCenteredText(g, GameCredits.CREATORS.get(i), W/2, 330+i*62, 25, Color.WHITE);
+        drawCenteredText(g, "Obrigado por caminhar ao lado da natureza.", W/2, 485, 20, new Color(227,238,219));
 
         g.setColor(new Color(255, 216, 92));
         g.fillRoundRect(480, 535, 320, 64, 12, 12);
@@ -1760,6 +1905,7 @@ public final class Game extends JPanel {
     private boolean hasSave(int slot) { return saveManager.hasSave(slot); }
     private Properties readSave(int slot) { return saveManager.read(slot); }
     private void saveGame() {
+        if (simulationMode) return;
         Properties p = new Properties();
         p.setProperty("character", selectedCharacter.id());
         p.setProperty("celebration", String.valueOf(celebrationActive));
@@ -1841,7 +1987,7 @@ public final class Game extends JPanel {
         catch (NumberFormatException ignored) { return fallback; }
     }
     private void deleteSave(int slot) { if (saveManager.exists(slot)) { if (saveManager.delete(slot)) showToast("Slot apagado."); else showToast("Nao foi possivel apagar este slot."); } screen = GameState.SLOTS; }
-    private void showToast(String message) { toast = message; toastUntil = System.currentTimeMillis() + 2200; }
+    private void showToast(String message) { toast = message; toastUntil = System.currentTimeMillis() + 2200; repaint(); }
     private static double clamp(double value, double min, double max) { return Math.max(min, Math.min(max, value)); }
 
 

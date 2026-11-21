@@ -12,10 +12,13 @@ import java.nio.file.StandardCopyOption;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 
 /** Resolves game assets from the classpath, with a project-folder fallback for development. */
 public final class AssetManager {
     private static final Set<String> WARNED_MISSING = ConcurrentHashMap.newKeySet();
+    private static final ConcurrentHashMap<String, File> EXTRACTED = new ConcurrentHashMap<>();
 
     private AssetManager() { }
 
@@ -51,6 +54,26 @@ public final class AssetManager {
         return null;
     }
 
+    /** Decodes near the display size, avoiding giant temporary UI bitmaps. */
+    public static BufferedImage image(String path, int maxWidth, int maxHeight) {
+        if (maxWidth < 1 || maxHeight < 1) throw new IllegalArgumentException("Dimensões inválidas");
+        try (InputStream input = open(path); ImageInputStream stream = ImageIO.createImageInputStream(input)) {
+            var readers = ImageIO.getImageReaders(stream);
+            if (!readers.hasNext()) throw new IOException("Formato de imagem inválido");
+            ImageReader reader = readers.next();
+            try {
+                reader.setInput(stream, true, true);
+                int sample = Math.max(1, Math.min(reader.getWidth(0) / maxWidth, reader.getHeight(0) / maxHeight));
+                var parameters = reader.getDefaultReadParam();
+                parameters.setSourceSubsampling(sample, sample, 0, 0);
+                return reader.read(0, parameters);
+            } finally { reader.dispose(); }
+        } catch (IOException | RuntimeException error) {
+            warn("Could not read image '" + path + "': " + error.getMessage());
+            return null;
+        }
+    }
+
     /** Returns a filesystem file for APIs such as JavaFX Media that require a URI. */
     public static File file(String path) {
         return resolveFile(path, true);
@@ -75,17 +98,25 @@ public final class AssetManager {
             }
         }
         if (resource != null) {
-            String extension = resourcePath.contains(".") ? resourcePath.substring(resourcePath.lastIndexOf('.')) : ".asset";
-            try (InputStream input = resource.openStream()) {
-                Path temporaryFile = Files.createTempFile("raizes-asset-", extension);
-                Files.copy(input, temporaryFile, StandardCopyOption.REPLACE_EXISTING);
-                temporaryFile.toFile().deleteOnExit();
-                return temporaryFile.toFile();
-            } catch (IOException exception) {
-                warn("Could not extract asset '" + path + "': " + exception.getMessage());
-            }
+            File cached = EXTRACTED.get(resourcePath);
+            if (cached != null && cached.isFile()) return cached;
+            if (cached != null) EXTRACTED.remove(resourcePath, cached);
+            return EXTRACTED.computeIfAbsent(resourcePath, ignored -> extract(resource, resourcePath));
         }
         if (warnIfMissing) warn("File asset not found: " + path);
+        return null;
+    }
+
+    private static File extract(URL resource, String resourcePath) {
+        String extension = resourcePath.contains(".") ? resourcePath.substring(resourcePath.lastIndexOf('.')) : ".asset";
+        try (InputStream input = resource.openStream()) {
+            Path temporaryFile = Files.createTempFile("raizes-asset-", extension);
+            temporaryFile.toFile().deleteOnExit();
+            Files.copy(input, temporaryFile, StandardCopyOption.REPLACE_EXISTING);
+            return temporaryFile.toFile();
+        } catch (IOException exception) {
+            warn("Could not extract asset '" + resourcePath + "': " + exception.getMessage());
+        }
         return null;
     }
 

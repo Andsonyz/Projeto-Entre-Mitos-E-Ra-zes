@@ -22,17 +22,23 @@ import javax.swing.SwingUtilities;
 public final class CharacterSelectionRegressionTest {
     public static void main(String[] args) {
         int result = 0;
-        try { selectionBeforeVideo(); pendingVideoResume(); System.out.println("OK: seleção, bloqueio por teclado/mouse/API, saves antigos e vídeos pendentes."); }
+        try {
+            // Match Main: prepare one resource bundle, then reuse it across game sessions.
+            GameAssets assets = GameAssets.load(ignored -> { });
+            selectionBeforeVideo(assets);
+            pendingVideoResume(assets);
+            System.out.println("OK: seleção, bloqueio por teclado/mouse/API, saves antigos e vídeos pendentes.");
+        }
         catch (Throwable error) { result = 1; error.printStackTrace(); }
         finally { Platform.exit(); }
         System.exit(result);
     }
 
-    private static void selectionBeforeVideo() throws Exception {
+    private static void selectionBeforeVideo(GameAssets assets) throws Exception {
         Path directory = Files.createTempDirectory("raizes-selection-");
         SaveManager saves = new SaveManager(directory);
         Game game = edt(() -> {
-            Game created = new Game(new CinematicCatalog((java.io.File) null), saves);
+            Game created = new Game(new CinematicCatalog((java.io.File) null), saves, assets);
             created.timer.stop();
             created.setSize(1280, 720);
             return created;
@@ -83,19 +89,19 @@ public final class CharacterSelectionRegressionTest {
                     "Save legado ou personagem indisponível não adotou o masculino.");
             }
         } finally {
-            edt(() -> { game.cinematicManager.dispose(); return null; });
+            edt(() -> { game.close(); return null; });
             Files.deleteIfExists(directory.resolve("slot-1.properties"));
             Files.deleteIfExists(directory);
         }
     }
 
-    private static void pendingVideoResume() throws Exception {
+    private static void pendingVideoResume(GameAssets assets) throws Exception {
         Path directory = Files.createTempDirectory("raizes-pending-video-");
         Path configuration = directory.resolve("cinematics.properties");
         Files.writeString(configuration, "prologue.1.video=missing-prologue.mp4\nchapter.1.1.video=missing-chapter.mp4\n");
         SaveManager saves = new SaveManager(directory.resolve("saves"));
         Game game = edt(() -> {
-            Game created = new Game(new CinematicCatalog(configuration.toFile()), saves);
+            Game created = new Game(new CinematicCatalog(configuration.toFile()), saves, assets);
             created.timer.stop();
             return created;
         });
@@ -131,7 +137,7 @@ public final class CharacterSelectionRegressionTest {
             check(edt(() -> game.screen) == GameState.CINEMATIC,
                 "Continue não pode liberar capítulo com vídeo pendente.");
         } finally {
-            edt(() -> { game.cinematicManager.dispose(); return null; });
+            edt(() -> { game.close(); return null; });
             Files.deleteIfExists(directory.resolve("saves/slot-1.properties"));
             Files.deleteIfExists(directory.resolve("saves"));
             Files.deleteIfExists(configuration);

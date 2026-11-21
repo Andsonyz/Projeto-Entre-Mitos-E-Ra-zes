@@ -38,8 +38,13 @@ try {
     }
     foreach ($relative in $assets) {
         $destination = Join-Path $outputPath $relative
+        $source = Get-Item -LiteralPath (Join-Path $projectRoot $relative)
+        if (Test-Path -LiteralPath $destination -PathType Leaf) {
+            $existing = Get-Item -LiteralPath $destination
+            if ($existing.Length -eq $source.Length -and $existing.LastWriteTimeUtc -eq $source.LastWriteTimeUtc) { continue }
+        }
         New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
-        Copy-Item -LiteralPath (Join-Path $projectRoot $relative) -Destination $destination -Force
+        Copy-Item -LiteralPath $source.FullName -Destination $destination -Force
     }
     Set-Content -LiteralPath $manifestPath -Value $assets -Encoding UTF8
     Write-Output "Compilacao e recursos prontos em $outputPath"

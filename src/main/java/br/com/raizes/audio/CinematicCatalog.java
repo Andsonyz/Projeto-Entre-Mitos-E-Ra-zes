@@ -16,7 +16,7 @@ import java.util.regex.Pattern;
 
 /** Loads ordered playlists once; changing videos does not require recompiling Java. */
 public final class CinematicCatalog {
-    private static final Pattern VIDEO_KEY = Pattern.compile("(prologue|chapter\\.[1-9]\\d*)\\.([1-9]\\d*)\\.video");
+    private static final Pattern VIDEO_KEY = Pattern.compile("(prologue|ending|chapter\\.[1-9]\\d*)\\.([1-9]\\d*)\\.video");
     private final Map<String, List<CinematicScene>> playlists;
 
     public CinematicCatalog() {
@@ -28,6 +28,8 @@ public final class CinematicCatalog {
     }
 
     public List<CinematicScene> prologue() { return playlists.getOrDefault("prologue", List.of()); }
+
+    public List<CinematicScene> ending() { return playlists.getOrDefault("ending", List.of()); }
 
     public List<CinematicScene> beforeChapter(int chapter) {
         return playlists.getOrDefault("chapter." + chapter, List.of());

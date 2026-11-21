@@ -94,7 +94,7 @@ final class WorldRenderer {
         game.drawText(g, game.celebrationActive ? "FASE FINAL - CELEBRA\u00c7\u00c3O DA FLORESTA" : Phase.values()[game.currentPhase].title,
             34, 31, 15, new Color(255, 226, 125));
         game.drawText(g, game.objectiveStatus() + (game.celebrationActive ? "" : "   VIDAS " + "*".repeat(game.lives)), 34, 58, 17, Color.WHITE);
-        String controls = game.celebrationActive ? "E conversar   M mapa   F5 salvar   Esc pausa" : game.currentPhase == 0 || game.currentPhase == 2
+        String controls = game.celebrationActive ? "E conversar   M mapa   F5 salvar" : game.currentPhase == 0 || game.currentPhase == 2
             ? "E interage   A/D correr   Espaco pular   M mapa   Esc pausa"
             : "A/D correr   Espaco pular   M mapa   F5 salvar   Esc pausa";
         game.drawText(g, controls, 690, 58, 15, Color.WHITE);

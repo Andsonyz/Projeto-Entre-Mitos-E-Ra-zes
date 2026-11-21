@@ -23,7 +23,7 @@ Origem, dimensões, organização e SHA-256 dos recursos estão em [PERSONAGENS.
 | Imagens | `Image/Personagens/AventureiroMasculino/PersonagemParado.png`, `PersonagemAndando.png`, `PersonagemCorrendo.png`, `PersonagemPulando.png` |
 | Regressões | `src/test/java/br/com/raizes/audio/CinematicRegressionTest.java`, `src/test/java/br/com/raizes/character/CharacterSpriteRegressionTest.java`, `src/test/java/br/com/raizes/core/CharacterSelectionRegressionTest.java`, `GameFlowRegressionTest.java` |
 | Execução dos testes | `scripts/test-project.ps1` |
-| Documentação | `README.md`, `docs/VIDEOS.md`, `docs/PERSONAGENS.md`, este relatório e `docs/superpowers/plans/2026-10-21-video-personagens.md` |
+| Documentação | `README.md`, `docs/VIDEOS.md`, `docs/PERSONAGENS.md`, este relatório e `docs/historico/planejamento-personagens.md` |
 
 Os PNGs antigos foram preservados. `Main.java`, `run.bat` e o mecanismo de gravação de `SaveManager` não precisaram de mudanças para esta atualização.
 

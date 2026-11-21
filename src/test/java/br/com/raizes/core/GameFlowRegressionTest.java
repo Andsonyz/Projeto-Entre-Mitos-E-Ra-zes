@@ -50,6 +50,7 @@ public final class GameFlowRegressionTest {
             chapter.2.1.video=Videos/Cenas/CenaFase2.mp4
             chapter.3.1.video=Videos/Cenas/CenaFase3.mp4
             chapter.4.1.video=Videos/Cenas/CenaFase4.mp4
+            ending.1.video=Videos/Cenas/CenaFinal.mp4
             """, StandardCharsets.UTF_8);
         SaveManager saves = new SaveManager(saveDirectory);
         Game game = edt(() -> {
@@ -145,6 +146,12 @@ public final class GameFlowRegressionTest {
             expectScreen(game, GameState.WORLD);
             check(edt(() -> game.celebrationActive), "A campanha deve terminar na fase comemorativa.");
             check(Boolean.parseBoolean(saves.read(0).getProperty("campaignComplete")), "A conclusão deve ser salva.");
+            press(game,KeyEvent.VK_ENTER);
+            awaitVideo(game,"CenaFinal.mp4");
+            expectScreen(game,GameState.CINEMATIC);
+            awaitScreen(game,GameState.END);
+            press(game,KeyEvent.VK_ENTER);
+            expectScreen(game,GameState.MENU);
 
             // Invalid numeric values must not poison world coordinates or camera calculations.
             checkpoint.setProperty("x", "NaN");

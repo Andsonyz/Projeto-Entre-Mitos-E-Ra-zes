@@ -113,7 +113,8 @@ public final class CinematicRegressionTest {
             });
             MediaPlayer firstPlayer = awaitVideo(manager, "CenaFase1.mp4");
             Runnable staleEnd = fx(firstPlayer::getOnEndOfMedia);
-            check(fx(() -> firstPlayer.getMedia().getWidth()) == 1280, "Vídeo não foi decodificado.");
+            check(fx(() -> firstPlayer.getMedia().getWidth()) == 960
+                && fx(() -> firstPlayer.getMedia().getHeight()) == 540, "Vídeo otimizado não foi decodificado.");
             MediaPlayer secondPlayer = awaitVideo(manager, "CenaFase2.mp4");
             Runnable lastEnd = fx(secondPlayer::getOnEndOfMedia);
             fx(() -> { staleEnd.run(); return null; });

@@ -3,6 +3,8 @@ setlocal EnableDelayedExpansion
 set "PROJECT_DIR=%~dp0"
 set "OUTPUT_DIR=%PROJECT_DIR%out\runtime"
 set "JAVAFX_MODULES=javafx.controls,javafx.media,javafx.swing"
+set "JAVA_MEMORY=-Xms64m -Xmx256m"
+if /i "%~1"=="--leve" set "JAVA_MEMORY=-Xms32m -Xmx128m -Draizes.lowPower=true"
 
 where java >nul 2>nul
 if errorlevel 1 (
@@ -33,4 +35,4 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "%PROJECT_DIR%scripts\build-
 if errorlevel 1 exit /b 1
 
 cd /d "%PROJECT_DIR%"
-java -cp "%OUTPUT_DIR%" --module-path "%PROJECT_DIR%lib\javafx" --add-modules "%JAVAFX_MODULES%" --enable-native-access=javafx.graphics,javafx.media br.com.raizes.Main
+java %JAVA_MEMORY% -cp "%OUTPUT_DIR%" --module-path "%PROJECT_DIR%lib\javafx" --add-modules "%JAVAFX_MODULES%" --enable-native-access=javafx.graphics,javafx.media br.com.raizes.Main

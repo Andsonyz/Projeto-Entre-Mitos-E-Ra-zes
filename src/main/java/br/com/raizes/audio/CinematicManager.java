@@ -45,7 +45,7 @@ public final class CinematicManager {
     private volatile PlaybackState state = PlaybackState.IDLE;
     // Remaining playback state is confined to the JavaFX thread.
     private final PauseTransition startupTimeout = new PauseTransition(Duration.seconds(12));
-    private final PauseTransition retryDelay = new PauseTransition(Duration.millis(200));
+    private final PauseTransition retryDelay = new PauseTransition(Duration.millis(500));
     private MediaView mediaView;
     private Label title, caption, statusMessage;
     private VBox statusBox;
@@ -57,6 +57,7 @@ public final class CinematicManager {
     private Runnable onFinished;
     private String sequenceTitle;
     private boolean active, skipHeld;
+    private volatile boolean simulationMode;
     private int sceneIndex, retryCount;
     private long activeSequence;
     private volatile long sceneRevision;
@@ -77,6 +78,7 @@ public final class CinematicManager {
 
     public Component panel() { return panel; }
     public PlaybackState state() { return state; }
+    public void setSimulationMode(boolean enabled) { simulationMode = enabled; }
     /** Complete before attaching the JFXPanel to a visible Swing window. */
     public CompletableFuture<Void> ready() { return ready.copy(); }
 
@@ -146,6 +148,8 @@ public final class CinematicManager {
             state = PlaybackState.IDLE;
             sceneRevision++;
             releasePlayer();
+            if (statusBox != null) statusBox.setVisible(false);
+            if (progress != null) progress.setVisible(false);
             scenes = List.of();
             onFinished = null;
             onSwingThread(() -> {
@@ -193,6 +197,8 @@ public final class CinematicManager {
         recovery = new HBox(20, retry, back);
         recovery.setAlignment(Pos.CENTER);
         statusBox = new VBox(24, progress, statusMessage, recovery);
+        statusBox.setVisible(false);
+        progress.setVisible(false);
         statusBox.setAlignment(Pos.CENTER);
         statusBox.setStyle("-fx-background-color: rgba(0, 0, 0, 0.92); -fx-padding: 36px;");
         skipButton = new Button("Pular esta cena  •  P");
@@ -204,7 +210,7 @@ public final class CinematicManager {
         Scene scene = new Scene(root, GameConfig.W, GameConfig.H);
         scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
             if (event.getCode() == KeyCode.ESCAPE) { cancel(); event.consume(); }
-            else if (event.getCode() == KeyCode.P) {
+            else if (event.getCode() == KeyCode.P || simulationMode && event.getCode() == KeyCode.F8) {
                 if (!skipHeld) { skipHeld = true; advanceScene(sceneRevision); }
                 event.consume();
             }
@@ -214,7 +220,9 @@ public final class CinematicManager {
                 event.consume(); // Input cannot synthesize a natural end of media.
             }
         });
-        scene.addEventFilter(KeyEvent.KEY_RELEASED, event -> { if (event.getCode() == KeyCode.P) skipHeld = false; });
+        scene.addEventFilter(KeyEvent.KEY_RELEASED, event -> {
+            if (event.getCode() == KeyCode.P || event.getCode() == KeyCode.F8) skipHeld = false;
+        });
         panel.setScene(scene);
     }
 
@@ -227,8 +235,9 @@ public final class CinematicManager {
         title.setText(sequenceTitle + "  •  CENA " + (sceneIndex + 1));
         caption.setText(current.caption());
         showStatus(PlaybackState.LOADING, "Carregando vídeo…", false);
+        startupTimeout.setDuration(Duration.seconds(45));
         startupTimeout.setOnFinished(event -> failScene(revision, current.video(),
-            new IllegalStateException("O vídeo não iniciou em 12 segundos.")));
+            new IllegalStateException("Não foi possível carregar o arquivo do vídeo.")));
         startupTimeout.playFromStart();
         // Filesystem access and extraction of packaged resources cannot block either UI thread.
         CompletableFuture.supplyAsync(() -> AssetManager.optionalFile(current.video())).whenComplete((file, error) ->
@@ -243,6 +252,10 @@ public final class CinematicManager {
 
     private void preparePlayer(long revision, File file) {
         String path = file.getAbsolutePath();
+        startupTimeout.setDuration(Duration.seconds(20));
+        startupTimeout.setOnFinished(event -> failScene(revision, path,
+            new IllegalStateException("O decoder não respondeu durante a preparação do vídeo.")));
+        startupTimeout.playFromStart();
         try {
             Media media = new Media(file.toURI().toString());
             media.setOnError(() -> failScene(revision, path, media.getError()));
@@ -260,6 +273,7 @@ public final class CinematicManager {
                 startupTimeout.stop();
                 state = PlaybackState.PLAYING;
                 statusBox.setVisible(false);
+                progress.setVisible(false);
             });
             nextPlayer.setOnStalled(() -> {
                 if (!isCurrent(revision)) return;
@@ -284,10 +298,13 @@ public final class CinematicManager {
         if (!isCurrent(revision)) return;
         long failedRevision = ++sceneRevision;
         releasePlayer();
-        if (retryCount == 0 && error instanceof MediaException mediaError
+        if (retryCount < 2 && error instanceof MediaException mediaError
                 && mediaError.getType() == MediaException.Type.UNKNOWN) {
             retryCount++;
-            showStatus(PlaybackState.LOADING, "Preparando o vídeo novamente…", false);
+            // Native decoder creation can fail briefly under memory/device contention.
+            // Give disposed resources time to settle; keep the UI and skip/cancel live.
+            retryDelay.setDuration(Duration.millis(500L * retryCount));
+            showStatus(PlaybackState.LOADING, "Preparando o vídeo novamente… (" + (retryCount + 1) + "/3)", false);
             System.err.println("[Entre Mitos e Raízes] Reiniciando decoder de " + path + ": " + error);
             retryDelay.setOnFinished(event -> { if (isCurrent(failedRevision)) loadCurrentScene(); });
             retryDelay.playFromStart();
@@ -319,6 +336,7 @@ public final class CinematicManager {
         startupTimeout.stop();
         retryDelay.stop();
         statusBox.setVisible(false);
+        progress.setVisible(false);
         Runnable finished = onFinished;
         onFinished = null;
         long request = activeSequence;

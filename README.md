@@ -14,6 +14,9 @@ Desenvolvido em **Java**, com **Swing/AWT** para a interface e **JavaFX Media** 
 - Carregamento inicial em segundo plano, com arte própria antes do menu.
 - Fundos específicos para caça, parkour, queimadas e resíduos.
 - Música ambiente em looping: menu e floresta, com silêncio durante as cinemáticas.
+- Encerramento pela celebração, vídeo final e créditos dos criadores, com retorno ao menu.
+- Simulação da campanha sem deslocamento ou coleta manual, isolada dos saves.
+- Modo leve para reduzir o trabalho de renderização em computadores com poucos recursos.
 
 ## Requisitos e compatibilidade
 
@@ -24,7 +27,7 @@ O projeto está configurado para **Windows** e possui duas opções de execuçã
 | Script `run.bat` | 25 ou superior | 25.0.1 | `lib/javafx/` |
 | VS Code | 27 | 25.0.1 | `lib/javafx/` |
 
-A compilação com `--release 25`, a abertura, os fundos e os testes de apresentação foram verificados com **JDK 27 nas duas versões do JavaFX**. A execução no JDK 25 não foi testada. As versões JavaFX atuais apresentam limitações conhecidas de vídeo: crescimento de memória no 27 e falhas intermitentes de preparação no 25.0.1. Os resultados estão discriminados no [registro da atualização](docs/atualizacao-jogo.md); as dependências foram mantidas.
+A execução padrão usa **JDK 27 e JavaFX 25.0.1**, com compilação `--release 25`. O JDK 25 não foi executado neste ambiente. O SDK JavaFX 27 existente permanece disponível para diagnóstico, com uma limitação conhecida de memória durante vídeos. Nenhuma dependência foi atualizada. Consulte [desempenho e validação](docs/DESEMPENHO.md).
 
 Mantenha as pastas `Image/`, `Audio/` e `Videos/` junto ao projeto. O projeto compila diretamente com `javac`, sem Maven ou Gradle. Os recursos de interface antes separados em `src/main/resources/` foram reunidos em `Image/`.
 
@@ -46,6 +49,14 @@ Com `java` e `javac` da mesma versão no `PATH` e o JavaFX 25.0.1 em `lib/javafx
 ```powershell
 .\run.bat
 ```
+
+Para o modo leve, com heap de até 128 MiB e renderização de até 30 quadros/s:
+
+```powershell
+.\run.bat --leve
+```
+
+No VS Code, a configuração **Entre Mitos e Raizes - Modo leve** oferece o mesmo perfil. O modo padrão limita o heap a 256 MiB. Esses valores se referem à memória Java; o sistema, a janela e o decoder de vídeo utilizam memória adicional. A física e as regras são iguais nos dois perfis.
 
 O script usa `scripts/build-project.ps1` para compilar e copiar os recursos para `out/runtime/`, depois inicia o jogo. Ele utiliza **JavaFX 25.0.1**, mesmo quando o JDK instalado é o 27. O VS Code utiliza `out/vscode/` para suas classes, separado da distribuição e dos testes.
 
@@ -73,6 +84,8 @@ A abertura exibe `Image/Cenarios/Menu/Carregamento.png` durante a preparação d
 | `1` a `4` | Selecionar uma resposta no quiz; confirmar com `Enter` ou `Espaço` |
 | `Delete` / `R` | Excluir / reiniciar a campanha do slot selecionado, após confirmação |
 | Mouse | Navegar pelas telas e interagir com elementos próximos |
+| `Enter` na celebração | Encerrar a jornada e assistir ao vídeo final antes dos créditos |
+| `F8` na simulação | Avançar a etapa atual, incluindo vídeos, objetivos e quiz |
 
 ## Campanha
 
@@ -87,6 +100,14 @@ A abertura exibe `Image/Cenarios/Menu/Carregamento.png` durante a preparação d
 Cada capítulo apresenta a lenda do guardião e termina com um diálogo e um quiz. São sorteadas cinco perguntas por rodada, de um banco de oito por fase; a ordem das alternativas também muda. Uma resposta incorreta reinicia a rodada. `Esc` ou **Voltar à trilha** permite deixar a conversa ou o quiz. Ao retornar ao desafio, a rodada recomeça.
 
 Ao chegar à saída com tarefas pendentes, o guardião informa as quantidades que faltam. Concluir os objetivos e acertar as cinco questões abre um agradecimento antes do próximo capítulo. Após o quarto, a celebração usa `BackgroundFinal.png` e permite conversar novamente com os guardiões por `E` ou clicando neles quando estiver próximo. Campanhas antigas já concluídas também têm acesso a essa área.
+
+Na celebração, **Encerrar / Enter** inicia `CenaFinal.mp4`; ao terminar, aparecem os créditos de **Antonio Andson de Oliveira Rocha** e **Sophia Hellen Pires da Silveira**. O botão **Voltar ao menu**, `Enter` ou `Esc` retorna ao menu. O save concluído continua disponível para explorar a celebração novamente. Os créditos também podem ser consultados em **? → Créditos**.
+
+### Simular sem jogar manualmente
+
+Abra **? → Simular campanha** ou pressione `T` na ajuda. Clique no rodapé **SIMULAÇÃO** ou pressione `F8` para avançar: o controle libera a apresentação, conclui os objetivos, avança as falas e responde às cinco questões pelo mesmo fluxo da campanha. Na celebração, percorre as conversas dos quatro guardiões e o encerramento. Nos vídeos, `F8` pula somente a cena atual; os controles normais continuam disponíveis.
+
+A faixa **SIMULAÇÃO** identifica esse modo. Ele não grava, apaga ou altera nenhum slot. Ao voltar ao menu, o atalho é desativado. Novo jogo e Continuar seguem as regras normais.
 
 ### Vídeos antes dos capítulos
 
@@ -156,6 +177,18 @@ Essa suíte também abre e fecha uma janela real para conferir a transição de 
 java --module-path lib/javafx --add-modules javafx.controls,javafx.media,javafx.swing -cp out/project-tests/classes br.com.raizes.audio.AmbientAudioDeviceTest
 ```
 
-Os resultados atuais, a limpeza de arquivos e as limitações conhecidas de reprodução/memória das versões JavaFX mantidas estão no [registro da atualização](docs/atualizacao-jogo.md).
+As verificações de poucos recursos podem ser executadas com:
 
-Os testes usam saves temporários e geram imagens em `out/project-tests/artifacts/`. Cobrem término natural dos vídeos, cancelamento, recuperação, suspensão da fase, seleção, sprites e saves antigos. Consulte os [resultados e limitações da atualização](docs/VALIDACAO-VIDEO-PERSONAGENS.md), os [detalhes dos personagens e recursos](docs/PERSONAGENS.md) e o [registro anterior de revisão](docs/REVISAO.md).
+```powershell
+.\scripts\test-project.ps1 -Suite Performance -Release 25
+```
+
+Esse comando usa heap de 128 MiB e dois processadores disponíveis para a JVM. Testa a preparação repetida dos cinco vídeos, a interface ociosa, a física, a simulação e a campanha completa até os créditos. Veja [desempenho](docs/DESEMPENHO.md) para resultados e limites.
+
+Para gerar e verificar um JAR fora das pastas de recursos:
+
+```powershell
+.\scripts\test-package.ps1
+```
+
+Os testes usam saves temporários e geram imagens em `out/project-tests/artifacts/`. Cobrem término natural dos vídeos, cancelamento, recuperação, suspensão da fase, seleção, sprites e saves antigos. O [índice da documentação](docs/README.md) separa guias atuais dos registros históricos.

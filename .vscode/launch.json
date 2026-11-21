@@ -10,10 +10,26 @@
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "vmArgs": [
+        "-Xms64m",
+        "-Xmx256m",
         "--module-path",
         "${workspaceFolder}/lib/javafx",
         "--add-modules",
         "javafx.controls,javafx.swing,javafx.media",
+        "--enable-native-access=javafx.graphics,javafx.media"
+      ]
+    },
+    {
+      "type": "java",
+      "name": "Entre Mitos e Raizes - Modo leve",
+      "request": "launch",
+      "mainClass": "br.com.raizes.Main",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "vmArgs": [
+        "-Xms32m", "-Xmx128m", "-Draizes.lowPower=true",
+        "--module-path", "${workspaceFolder}/lib/javafx",
+        "--add-modules", "javafx.controls,javafx.swing,javafx.media",
         "--enable-native-access=javafx.graphics,javafx.media"
       ]
     }
